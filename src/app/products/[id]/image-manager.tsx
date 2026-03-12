@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { DragEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
+import ImageLightbox from "@/components/image-lightbox";
 
 type ProductImage = {
   id: string;
@@ -21,9 +23,26 @@ function getImageSourceLabel(image: ProductImage) {
   return image.downloadStatus === "downloaded" ? "Local" : "Remote";
 }
 
-function truncateMiddle(value: string, start = 28, end = 18) {
-  if (value.length <= start + end) return value;
-  return `${value.slice(0, start)}...${value.slice(-end)}`;
+function reorderImages(
+  items: ProductImage[],
+  activeId: string,
+  overId: string
+): ProductImage[] {
+  const current = [...items];
+  const fromIndex = current.findIndex((img) => img.id === activeId);
+  const toIndex = current.findIndex((img) => img.id === overId);
+
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+    return current;
+  }
+
+  const [moved] = current.splice(fromIndex, 1);
+  current.splice(toIndex, 0, moved);
+
+  return current.map((img, index) => ({
+    ...img,
+    sortOrder: index + 1,
+  }));
 }
 
 export default function ImageManager({
@@ -37,16 +56,32 @@ export default function ImageManager({
 
   const [images, setImages] = useState<ProductImage[]>(sortImages(initialImages));
   const [saving, setSaving] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  const selectedImages = useMemo(
-    () =>
-      sortImages(images).filter((img) => img.isSelected),
-    [images]
-  );
+  useEffect(() => {
+    setImages(sortImages(initialImages));
+  }, [initialImages]);
 
   const orderedImages = useMemo(() => sortImages(images), [images]);
 
+  const selectedImages = useMemo(
+    () => orderedImages.filter((img) => img.isSelected),
+    [orderedImages]
+  );
+
   const coverImageId = selectedImages[0]?.id ?? null;
+
+  const lightboxImages = useMemo(
+    () =>
+      orderedImages.map((img) => ({
+        src: img.localPath ?? img.sourceUrl,
+        alt: "Ürün görseli",
+      })),
+    [orderedImages]
+  );
 
   function toggleSelected(imageId: string) {
     setImages((prev) =>
@@ -56,35 +91,56 @@ export default function ImageManager({
     );
   }
 
-  function moveImage(imageId: string, direction: "up" | "down") {
-    const current = sortImages(images);
-    const index = current.findIndex((img) => img.id === imageId);
-
-    if (index === -1) return;
-    if (direction === "up" && index === 0) return;
-    if (direction === "down" && index === current.length - 1) return;
-
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    const swapped = [...current];
-
-    [swapped[index], swapped[targetIndex]] = [swapped[targetIndex], swapped[index]];
-
-    const normalized = swapped.map((img, i) => ({
-      ...img,
-      sortOrder: i + 1,
-    }));
-
-    setImages(normalized);
+  function openLightbox(index: number) {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
   }
 
-  async function copyPath(value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      toast.success("Path kopyalandı");
-    } catch (error) {
-      console.error(error);
-      toast.error("Path kopyalanamadı");
+  function onDragStart(event: DragEvent<HTMLDivElement>, imageId: string) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", imageId);
+    setDraggingId(imageId);
+  }
+
+  function onDragOver(event: DragEvent<HTMLDivElement>, imageId: string) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+
+    if (dragOverId !== imageId) {
+      setDragOverId(imageId);
     }
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>, overId: string) {
+    event.preventDefault();
+    const activeId = event.dataTransfer.getData("text/plain") || draggingId;
+
+    if (!activeId || activeId === overId) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    setImages((prev) => reorderImages(sortImages(prev), activeId, overId));
+    setDraggingId(null);
+    setDragOverId(null);
+  }
+
+  function onDragEnd() {
+    setDraggingId(null);
+    setDragOverId(null);
+  }
+
+  function goPrev() {
+    setLightboxIndex((prev) =>
+      prev === 0 ? lightboxImages.length - 1 : prev - 1
+    );
+  }
+
+  function goNext() {
+    setLightboxIndex((prev) =>
+      prev === lightboxImages.length - 1 ? 0 : prev + 1
+    );
   }
 
   async function saveChanges() {
@@ -110,13 +166,12 @@ export default function ImageManager({
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data?.error ?? "Görseller kaydedilemedi");
+        toast.error(data?.error ?? "Görsel ayarları kaydedilemedi");
         setSaving(false);
         return;
       }
 
-      const nextImages = sortImages(data.images ?? []);
-      setImages(nextImages);
+      setImages(sortImages(data.images ?? []));
       router.refresh();
       toast.success("Görsel ayarları kaydedildi");
     } catch (error) {
@@ -128,30 +183,29 @@ export default function ImageManager({
   }
 
   return (
-    <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-gray-100 pb-5 md:flex-row md:items-center md:justify-between">
+    <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+      <div className="mb-5 flex flex-col gap-4 border-b border-gray-100 pb-5 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
             Görsel Yönetimi
           </p>
-          <h3 className="mt-1 text-xl font-semibold text-gray-900">
-            Export görsellerini düzenle
-          </h3>
-          <p className="mt-2 max-w-2xl text-sm text-gray-500">
-            Seçili görseller export edilir. İlk seçili görsel kapak kabul edilir.
-            Sıralamayı değiştirerek kapak görseli de belirleyebilirsin.
+          <h2 className="mt-1 text-xl font-semibold text-gray-900">
+            Kompakt görsel sıralama alanı
+          </h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Görseller kare kartlar halinde listelenir. Sürükleyip bırakarak
+            sırayı değiştir, tıklayarak büyük önizlemeyi aç, export için
+            seçilecek görselleri işaretle.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">
-              {selectedImages.length}
-            </span>{" "}
-            seçili / {images.length} toplam
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700">
+            {selectedImages.length} seçili / {orderedImages.length} toplam
+          </span>
 
           <button
+            type="button"
             onClick={saveChanges}
             disabled={saving}
             className="rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -161,144 +215,117 @@ export default function ImageManager({
         </div>
       </div>
 
-      {images.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+      {orderedImages.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
           <div className="text-3xl">🖼️</div>
           <div className="mt-3 text-base font-semibold text-gray-700">
             Bu ürün için görsel yok
           </div>
           <p className="mt-2 text-sm text-gray-500">
-            Görseller indirildiğinde veya eşleştiğinde burada listelenecek.
+            Görseller indirildiğinde burada listelenecek.
           </p>
         </div>
       ) : (
-        <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {orderedImages.map((image, index) => {
-            const isCover = image.isSelected && image.id === coverImageId;
             const src = image.localPath ?? image.sourceUrl;
-            const pathValue = image.localPath ?? image.sourceUrl;
+            const isCover = image.isSelected && image.id === coverImageId;
+            const isDragging = draggingId === image.id;
+            const isDragOver = dragOverId === image.id;
 
             return (
-              <article
+              <div
                 key={image.id}
-                className={`overflow-hidden rounded-[26px] border transition ${
-                  image.isSelected
-                    ? "border-gray-900/20 bg-gray-50 shadow-sm"
-                    : "border-gray-200 bg-white"
+                draggable
+                onDragStart={(event) => onDragStart(event, image.id)}
+                onDragOver={(event) => onDragOver(event, image.id)}
+                onDrop={(event) => onDrop(event, image.id)}
+                onDragEnd={onDragEnd}
+                className={`group overflow-hidden rounded-[24px] border bg-white transition ${
+                  isDragging
+                    ? "scale-[0.98] opacity-60"
+                    : "hover:-translate-y-0.5 hover:shadow-sm"
+                } ${
+                  isDragOver
+                    ? "border-gray-900 ring-2 ring-gray-900/10"
+                    : "border-gray-200"
                 }`}
               >
-                <div className="grid gap-4 p-4 md:grid-cols-[148px_minmax(0,1fr)] md:p-5">
-                  <div className="relative overflow-hidden rounded-[22px] bg-gray-100">
-                    <img
-                      src={src}
-                      alt=""
-                      className="h-40 w-full object-cover md:h-full"
-                    />
+                <button
+                  type="button"
+                  onClick={() => openLightbox(index)}
+                  className="relative block aspect-square w-full overflow-hidden bg-gray-100"
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
+                  />
 
-                    <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-gray-800 shadow-sm">
-                        Sıra {index + 1}
+                  <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+                    <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-gray-800 shadow-sm">
+                      #{index + 1}
+                    </span>
+
+                    {isCover ? (
+                      <span className="rounded-full bg-gray-900 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+                        Kapak
                       </span>
-
-                      {isCover ? (
-                        <span className="rounded-full bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
-                          Kapak
-                        </span>
-                      ) : null}
-                    </div>
+                    ) : null}
                   </div>
 
-                  <div className="min-w-0 space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
-                        {getImageSourceLabel(image)}
-                      </span>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          image.isSelected
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {image.isSelected ? "Export’a dahil" : "Pasif"}
-                      </span>
-
-                      {image.downloadStatus ? (
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                          {image.downloadStatus}
-                        </span>
-                      ) : null}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-3 pt-8 text-left">
+                    <div className="text-[11px] font-medium text-white/85">
+                      Görseli büyüt
                     </div>
+                  </div>
+                </button>
 
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Kaynak / Path
-                      </div>
-                      <div className="mt-2 rounded-2xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-600">
-                        <div className="break-all font-mono text-xs leading-5">
-                          {truncateMiddle(pathValue)}
-                        </div>
+                <div className="space-y-3 p-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-semibold text-gray-700">
+                      {getImageSourceLabel(image)}
+                    </span>
 
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => copyPath(pathValue)}
-                            className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                          >
-                            Path Kopyala
-                          </button>
+                    <span
+                      className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                        image.isSelected
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {image.isSelected ? "Seçili" : "Pasif"}
+                    </span>
+                  </div>
 
-                          <a
-                            href={image.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                          >
-                            Kaynağı Aç
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleSelected(image.id)}
-                        className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
-                          image.isSelected
-                            ? "bg-gray-900 text-white hover:bg-gray-800"
-                            : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        {image.isSelected ? "Seçimi Kaldır" : "Export’a Dahil Et"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => moveImage(image.id, "up")}
-                        disabled={index === 0}
-                        className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        ↑ Yukarı
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => moveImage(image.id, "down")}
-                        disabled={index === orderedImages.length - 1}
-                        className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        ↓ Aşağı
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSelected(image.id)}
+                      className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                        image.isSelected
+                          ? "bg-gray-900 text-white hover:bg-gray-800"
+                          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {image.isSelected ? "Seçimi Kaldır" : "Seç"}
+                    </button>
                   </div>
                 </div>
-              </article>
+              </div>
             );
           })}
         </div>
       )}
+
+      <ImageLightbox
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        onPrev={lightboxImages.length > 1 ? goPrev : undefined}
+        onNext={lightboxImages.length > 1 ? goNext : undefined}
+      />
     </section>
   );
 }

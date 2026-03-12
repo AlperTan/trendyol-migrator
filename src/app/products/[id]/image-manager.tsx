@@ -193,9 +193,8 @@ export default function ImageManager({
             Kompakt görsel sıralama alanı
           </h2>
           <p className="mt-2 text-sm text-gray-500">
-            Görseller kare kartlar halinde listelenir. Sürükleyip bırakarak
-            sırayı değiştir, tıklayarak büyük önizlemeyi aç, export için
-            seçilecek görselleri işaretle.
+            Kare kartlar halinde sırala, büyük önizleme aç ve export’a girecek
+            görselleri seç.
           </p>
         </div>
 
@@ -298,19 +297,17 @@ export default function ImageManager({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleSelected(image.id)}
-                      className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                        image.isSelected
-                          ? "bg-gray-900 text-white hover:bg-gray-800"
-                          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {image.isSelected ? "Seçimi Kaldır" : "Seç"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSelected(image.id)}
+                    className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      image.isSelected
+                        ? "bg-gray-900 text-white hover:bg-gray-800"
+                        : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {image.isSelected ? "Seçimi Kaldır" : "Export’a Dahil Et"}
+                  </button>
                 </div>
               </div>
             );

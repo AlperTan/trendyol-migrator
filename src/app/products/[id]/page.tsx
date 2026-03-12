@@ -3,7 +3,6 @@ import Link from "next/link";
 import DownloadImagesButton from "./download-images-button";
 import ImageManager from "./image-manager";
 import ProductForm from "./product-form";
-import ProductGallery from "./product-gallery";
 
 type Product = {
   id: string;
@@ -13,6 +12,7 @@ type Product = {
   descriptionEdited: string | null;
   salePriceSource: number | null;
   salePriceEdited: number | null;
+  listPriceSource: number | null;
   brand: string | null;
   sku: string | null;
   barcode: string | null;
@@ -113,25 +113,6 @@ function getSourceProductUrl(
   return null;
 }
 
-type ActionBadgeProps = {
-  label: string;
-  value: string;
-  className?: string;
-};
-
-function ActionBadge({ label, value, className = "" }: ActionBadgeProps) {
-  return (
-    <div
-      className={`rounded-2xl border px-3 py-2 text-xs font-medium ${className}`}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-60">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold">{value}</div>
-    </div>
-  );
-}
-
 type StatCardProps = {
   label: string;
   value: string;
@@ -144,7 +125,9 @@ function StatCard({ label, value, hint }: StatCardProps) {
       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
         {label}
       </div>
-      <div className="mt-2 text-xl font-bold text-gray-900">{value}</div>
+      <div className="mt-2 break-all text-xl font-bold text-gray-900">
+        {value}
+      </div>
       {hint ? (
         <div className="mt-2 text-sm font-medium text-gray-500">{hint}</div>
       ) : null}
@@ -205,8 +188,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   </h1>
 
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500">
-                    Ürün düzenleme, görsel seçimi ve export öncesi kalite kontrol
-                    işlemlerini bu ekran üzerinden yönetiyorsun.
+                    Ürün düzenleme, görsel sıralama ve export öncesi kalite
+                    kontrol işlemlerini bu ekran üzerinden yönetiyorsun.
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -250,7 +233,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <div className="rounded-2xl border border-gray-200 bg-white p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
                         Source Product ID
@@ -271,46 +254,20 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       ) : null}
                     </div>
 
-                    <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Hızlı Durum
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <ActionBadge
-                          label="Panel"
-                          value={statusBadge.label}
-                          className={statusBadge.className}
-                        />
-                        <ActionBadge
-                          label="Kaynak"
-                          value={sourceBadge.label}
-                          className={sourceBadge.className}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="min-w-0 rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Workflow notu
-                      </div>
-                      <div className="mt-1 text-sm text-gray-600">
-                        Önce görselleri indir, sonra seçim ve sıralamayı netleştir,
-                        ardından içerik düzenlemesini kaydet.
-                      </div>
-                    </div>
-
                     <DownloadImagesButton productId={product.id} />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-2 md:px-6 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-2 md:px-6 xl:grid-cols-5">
               <StatCard
-                label="Kaynak Fiyat"
+                label="Liste Fiyatı"
+                value={`${formatPrice(product.listPriceSource)} ₺`}
+              />
+
+              <StatCard
+                label="Satış Fiyatı"
                 value={`${formatPrice(product.salePriceSource)} ₺`}
               />
 
@@ -326,122 +283,115 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
           </section>
         </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_420px]">
-          <div className="space-y-6">
-            
-            <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-              <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-                  İçerik Karşılaştırması
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-gray-900">
-                  Source vs Edited
-                </h2>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-[24px] border border-gray-200 bg-gray-50 p-4">
-                  <div className="mb-3 text-sm font-semibold text-gray-900">
-                    Kaynak Veri
-                  </div>
-
-                  <div className="space-y-4 text-sm text-gray-600">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Başlık
-                      </div>
-                      <p className="mt-1 leading-6 text-gray-800">
-                        {product.titleSource || "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Açıklama
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap leading-6 text-gray-800">
-                        {product.descriptionSource || "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Kategori
-                      </div>
-                      <p className="mt-1 text-gray-800">
-                        {product.categorySource || "-"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-gray-200 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900">
-                      Düzenlenen Veri
-                    </div>
-
-                    <span className="rounded-full bg-gray-900 px-3 py-1 text-[11px] font-semibold text-white">
-                      Aktif görünüm
-                    </span>
-                  </div>
-
-                  <div className="space-y-4 text-sm text-gray-600">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Başlık
-                      </div>
-                      <p className="mt-1 leading-6 text-gray-800">
-                        {product.titleEdited ?? product.titleSource}
-                      </p>
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Açıklama
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap leading-6 text-gray-800">
-                        {product.descriptionEdited ??
-                          product.descriptionSource ??
-                          "-"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-                        Kategori
-                      </div>
-                      <p className="mt-1 text-gray-800">
-                        {product.categorySource || "-"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <ImageManager productId={product.id} initialImages={product.images} />
-          </div>
-
-          <aside className="xl:sticky xl:top-6 xl:self-start">
-            <div className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
-              <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-                  Ürün Düzenleme
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-gray-900">
-                  Edit Paneli
-                </h2>
-                <p className="mt-2 text-sm text-gray-500">
-                  Sağ panel uzun sayfada sabit kalır; bu yüzden görselleri
-                  incelerken form alanları hep erişilebilir olur.
-                </p>
-              </div>
-
-              <ProductForm product={product} />
+        <ImageManager productId={product.id} initialImages={product.images} />
+        <div className="space-y-6">
+          <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+                İçerik Karşılaştırması
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-gray-900">
+                Source vs Edited
+              </h2>
             </div>
-          </aside>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-[24px] border border-gray-200 bg-gray-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-gray-900">
+                  Kaynak Veri
+                </div>
+
+                <div className="space-y-4 text-sm text-gray-600">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      Başlık
+                    </div>
+                    <p className="mt-1 leading-6 text-gray-800">
+                      {product.titleSource || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      Açıklama
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap leading-6 text-gray-800">
+                      {product.descriptionSource || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      Kategori
+                    </div>
+                    <p className="mt-1 text-gray-800">
+                      {product.categorySource || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-gray-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-gray-900">
+                    Düzenlenen Veri
+                  </div>
+
+                  <span className="rounded-full bg-gray-900 px-3 py-1 text-[11px] font-semibold text-white">
+                    Aktif görünüm
+                  </span>
+                </div>
+
+                <div className="space-y-4 text-sm text-gray-600">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      Başlık
+                    </div>
+                    <p className="mt-1 leading-6 text-gray-800">
+                      {product.titleEdited ?? product.titleSource}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      Açıklama
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap leading-6 text-gray-800">
+                      {product.descriptionEdited ??
+                        product.descriptionSource ??
+                        "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                      Kategori
+                    </div>
+                    <p className="mt-1 text-gray-800">
+                      {product.categorySource || "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+                Ürün Düzenleme
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-gray-900">
+                Edit Alanı
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                Form artık tam genişlikte; dar sağ kolon yerine daha rahat bir
+                çalışma alanı veriyor.
+              </p>
+            </div>
+
+            <ProductForm product={product} />
+          </section>
         </div>
       </div>
     </main>

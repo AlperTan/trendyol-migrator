@@ -7,37 +7,35 @@ datasource db {
 }
 
 model Product {
-  id                String         @id @default(cuid())
-
-  sourcePlatform    String
-  sourceProductId   String         @unique
-  sourceStatus      String?
-
-  titleSource       String
-  titleEdited       String?
-
-  descriptionSource String?
-  descriptionEdited String?
-
-  salePriceSource   Float?
-  salePriceEdited   Float?
-
-  listPriceSource   Float?
-
-  brand             String?
-  sku               String?
-  barcode           String?
-
-  categorySource    String?
-
-  productMainId     String?
-
-  status            String         @default("draft")
-
-  images            ProductImage[]
-
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                      String        @id @default(cuid())
+  sourcePlatform          String
+  sourceProductId         String        @unique
+  contentId               String?
+  sourceStatus            String?
+  titleSource             String
+  titleEdited             String?
+  descriptionSource       String?
+  descriptionEdited       String?
+  salePriceSource         Float?
+  salePriceEdited         Float?
+  listPriceSource         Float?
+  deliveryDurationSource  Int?
+  deliveryDurationEdited  Int?
+  vatRateSource           Float?
+  brand                   String?
+  brandId                 Int?
+  sku                     String?
+  barcode                 String?
+  categorySource          String?
+  categoryId              Int?
+  productMainId          String?
+  cargoCompanyId          Int?
+  shipmentAddressId       Int?
+  returningAddressId      Int?
+  status                  String        @default("draft")
+  images                  ProductImage[]
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 }
 
 model ProductImage {
@@ -50,5 +48,5 @@ model ProductImage {
   isSelected     Boolean  @default(true)
   createdAt      DateTime @default(now())
 
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

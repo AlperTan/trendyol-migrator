@@ -98,6 +98,18 @@ export async function GET(req: NextRequest) {
 
   const items = filtered.slice((page - 1) * pageSize, page * pageSize);
 
+  console.log(
+  "PRODUCTS API SAMPLE",
+  items.slice(0, 5).map((item) => ({
+    id: item.id,
+    title: item.titleEdited ?? item.titleSource,
+    contentId: item.contentId,
+    barcode: item.barcode,
+    deliveryDurationSource: item.deliveryDurationSource,
+    deliveryDurationEdited: item.deliveryDurationEdited,
+  }))
+);
+
   const [brands, categories] = await Promise.all([
     db.product.findMany({
       where: {

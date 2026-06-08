@@ -1,0 +1,1 @@
+export type N11ProductPayload = { title: string; description: string | null; stockCode: string | null; barcode: string | null; price: number | null; stock: number; categoryName: string | null; images: string[] };

@@ -1,0 +1,1 @@
+export type PttAvmProductPayload = { name: string; description: string | null; sku: string | null; barcode: string | null; price: number | null; quantity: number; categoryName: string | null; images: string[] };

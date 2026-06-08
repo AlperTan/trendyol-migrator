@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { cropWhiteMargins } from "@/lib/image-processing";
+import { processProductImage } from "@/lib/image-processing";
 import {
   getProductImagePublicPath,
   getProductStorageDir,
@@ -16,6 +16,26 @@ type RouteContext = {
 
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
+}
+
+function getOriginalExtension(url: string, contentType: string | null) {
+  const fromContentType: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+  };
+  if (contentType && fromContentType[contentType.split(";")[0]]) {
+    return fromContentType[contentType.split(";")[0]];
+  }
+
+  try {
+    const extension = path.extname(new URL(url).pathname).toLowerCase();
+    return [".jpg", ".jpeg", ".png", ".webp"].includes(extension)
+      ? extension
+      : ".jpg";
+  } catch {
+    return ".jpg";
+  }
 }
 
 export async function POST(_: NextRequest, context: RouteContext) {
@@ -44,39 +64,45 @@ export async function POST(_: NextRequest, context: RouteContext) {
     await ensureDir(baseDir);
 
     let downloaded = 0;
+    let processed = 0;
+    let skipped = 0;
+    const errors: Array<{ imageId: string; error: string }> = [];
 
     for (const image of product.images) {
-      const res = await fetch(image.sourceUrl);
+      try {
+        const res = await fetch(image.sourceUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      if (!res.ok) {
-        continue;
+        const original = Buffer.from(await res.arrayBuffer());
+        const result = await processProductImage(original);
+        const extension =
+          result.extension ??
+          getOriginalExtension(image.sourceUrl, res.headers.get("content-type"));
+        const filename = `${String(image.sortOrder).padStart(2, "0")}${extension}`;
+        const relativePath = getProductImagePublicPath(product.id, filename);
+
+        await fs.writeFile(path.join(baseDir, filename), result.buffer);
+        await db.productImage.update({
+          where: { id: image.id },
+          data: { localPath: relativePath, downloadStatus: "downloaded" },
+        });
+
+        downloaded += 1;
+        if (result.processed) processed += 1;
+      } catch (error) {
+        skipped += 1;
+        errors.push({
+          imageId: image.id,
+          error: error instanceof Error ? error.message : "Unknown image error",
+        });
       }
-
-      const arrayBuffer = await res.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      const processedBuffer = await cropWhiteMargins(buffer);
-
-      const filename = `${String(image.sortOrder).padStart(2, "0")}.jpg`;
-      const fullPath = path.join(baseDir, filename);
-
-      await fs.writeFile(fullPath, processedBuffer);
-
-      const relativePath = getProductImagePublicPath(product.id, filename);
-
-      await db.productImage.update({
-        where: { id: image.id },
-        data: {
-          localPath: relativePath,
-          downloadStatus: "downloaded",
-        },
-      });
-
-      downloaded += 1;
     }
 
     return NextResponse.json({
       downloaded,
+      processed,
+      skipped,
+      errors,
     });
   } catch (error) {
     console.error("DOWNLOAD IMAGES ERROR:", error);

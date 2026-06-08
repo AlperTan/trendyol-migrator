@@ -1,0 +1,1 @@
+export type ShopifyProductPayload = { title: string; descriptionHtml: string | null; vendor: string | null; sku: string | null; barcode: string | null; price: number | null; inventoryQuantity: number; images: string[] };

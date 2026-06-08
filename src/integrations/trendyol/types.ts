@@ -1,0 +1,1 @@
+export type TrendyolProductPayload = { title: string; description: string | null; brand: string | null; stockCode: string | null; barcode: string | null; quantity: number; salePrice: number | null; vatRate: number | null; categoryName: string | null; images: string[] };

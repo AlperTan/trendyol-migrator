@@ -1,0 +1,1 @@
+export type HepsiburadaProductPayload = { name: string; description: string | null; merchantSku: string | null; barcode: string | null; price: number | null; stock: number; categoryName: string | null; images: string[] };

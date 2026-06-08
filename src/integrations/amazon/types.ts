@@ -1,0 +1,1 @@
+export type AmazonListingPayload = { itemName: string; description: string | null; sellerSku: string | null; externalProductId: string | null; price: number | null; currency: string; quantity: number; productType: string | null; images: string[] };

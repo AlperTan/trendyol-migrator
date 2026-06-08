@@ -493,6 +493,9 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Link href="/export" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Export
+              </Link>
               <Link href="/products/new" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
                 Yeni Ürün
               </Link>

@@ -44,8 +44,17 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         body.salePriceEdited === "" || body.salePriceEdited == null
           ? null
           : Number(body.salePriceEdited),
+      stock: Math.max(0, Math.trunc(Number(body.stock) || 0)),
+      currency: body.currency?.trim() || "TRY",
+      vatRateEdited:
+        body.vatRateEdited === "" || body.vatRateEdited == null
+          ? null
+          : Number(body.vatRateEdited),
       brand: body.brand ?? null,
       sku: body.sku ?? null,
+      barcode: body.barcode ?? null,
+      categoryName: body.categoryName ?? null,
+      localCategoryId: body.localCategoryId ?? null,
       status: body.status ?? "draft",
     },
   });

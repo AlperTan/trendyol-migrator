@@ -7,35 +7,40 @@ datasource db {
 }
 
 model Product {
-  id                      String        @id @default(cuid())
-  sourcePlatform          String
-  sourceProductId         String        @unique
-  contentId               String?
-  sourceStatus            String?
-  titleSource             String
-  titleEdited             String?
-  descriptionSource       String?
-  descriptionEdited       String?
-  salePriceSource         Float?
-  salePriceEdited         Float?
-  listPriceSource         Float?
-  deliveryDurationSource  Int?
-  deliveryDurationEdited  Int?
-  vatRateSource           Float?
-  brand                   String?
-  brandId                 Int?
-  sku                     String?
-  barcode                 String?
-  categorySource          String?
-  categoryId              Int?
+  id                     String         @id @default(cuid())
+  sourcePlatform         String?
+  sourceProductId        String?        @unique
+  contentId              String?
+  sourceStatus           String?
+  titleSource            String
+  titleEdited            String?
+  descriptionSource      String?
+  descriptionEdited      String?
+  salePriceSource        Float?
+  salePriceEdited        Float?
+  stock                  Int            @default(0)
+  currency               String         @default("TRY")
+  listPriceSource        Float?
+  deliveryDurationSource Int?
+  deliveryDurationEdited Int?
+  vatRateSource          Float?
+  vatRateEdited          Float?
+  brand                  String?
+  brandId                Int?
+  sku                    String?
+  barcode                String?
+  categorySource         String?
+  categoryName           String?
+  categoryId             Int?
+  localCategoryId        String?
   productMainId          String?
-  cargoCompanyId          Int?
-  shipmentAddressId       Int?
-  returningAddressId      Int?
-  status                  String        @default("draft")
-  images                  ProductImage[]
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  cargoCompanyId         Int?
+  shipmentAddressId      Int?
+  returningAddressId     Int?
+  status                 String         @default("draft")
+  images                 ProductImage[]
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
 }
 
 model ProductImage {

@@ -12,355 +12,101 @@ type Product = {
   descriptionEdited: string | null;
   salePriceSource: number | null;
   salePriceEdited: number | null;
+  stock: number;
+  currency: string;
+  vatRateSource: number | null;
+  vatRateEdited: number | null;
   brand: string | null;
   sku: string | null;
+  barcode: string | null;
+  categorySource: string | null;
+  categoryName: string | null;
+  localCategoryId: string | null;
   status: string;
 };
 
 type FormState = {
-  titleEdited: string;
-  descriptionEdited: string;
-  salePriceEdited: string;
-  brand: string;
-  sku: string;
+  titleEdited: string; descriptionEdited: string; salePriceEdited: string;
+  stock: string; currency: string; vatRateEdited: string; brand: string;
+  sku: string; barcode: string; categoryName: string; localCategoryId: string;
   status: string;
 };
 
-function formatPrice(value: number | null) {
-  if (value == null) return "-";
-
-  return new Intl.NumberFormat("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function normalizeText(value: string | null | undefined) {
-  return (value ?? "").trim();
-}
+const inputClass = "mt-2 w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-gray-900";
 
 export default function ProductForm({ product }: { product: Product }) {
   const router = useRouter();
-
-  const initialForm = useMemo<FormState>(
-    () => ({
-      titleEdited: product.titleEdited ?? "",
-      descriptionEdited: product.descriptionEdited ?? "",
-      salePriceEdited:
-        product.salePriceEdited != null ? String(product.salePriceEdited) : "",
-      brand: product.brand ?? "",
-      sku: product.sku ?? "",
-      status: product.status ?? "draft",
-    }),
-    [product]
-  );
-
-  const [form, setForm] = useState<FormState>(initialForm);
+  const initialForm = useMemo<FormState>(() => ({
+    titleEdited: product.titleEdited ?? product.titleSource ?? "",
+    descriptionEdited: product.descriptionEdited ?? product.descriptionSource ?? "",
+    salePriceEdited: String(product.salePriceEdited ?? product.salePriceSource ?? ""),
+    stock: String(product.stock ?? 0),
+    currency: product.currency ?? "TRY",
+    vatRateEdited: String(product.vatRateEdited ?? product.vatRateSource ?? ""),
+    brand: product.brand ?? "",
+    sku: product.sku ?? "",
+    barcode: product.barcode ?? "",
+    categoryName: product.categoryName ?? product.categorySource ?? "",
+    localCategoryId: product.localCategoryId ?? "",
+    status: product.status ?? "draft",
+  }), [product]);
+  const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
 
-  const dirty =
-    normalizeText(form.titleEdited) !==
-      normalizeText(product.titleEdited ?? "") ||
-    normalizeText(form.descriptionEdited) !==
-      normalizeText(product.descriptionEdited ?? "") ||
-    normalizeText(form.salePriceEdited) !==
-      normalizeText(
-        product.salePriceEdited != null ? String(product.salePriceEdited) : ""
-      ) ||
-    normalizeText(form.brand) !== normalizeText(product.brand ?? "") ||
-    normalizeText(form.sku) !== normalizeText(product.sku ?? "") ||
-    normalizeText(form.status) !== normalizeText(product.status ?? "draft");
-
-  const parsedEditedPrice =
-    normalizeText(form.salePriceEdited) === ""
-      ? null
-      : Number(form.salePriceEdited);
-
-  const priceDelta =
-    parsedEditedPrice != null && product.salePriceSource != null
-      ? parsedEditedPrice - product.salePriceSource
-      : null;
-
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function resetAll() {
-    setForm(initialForm);
-    toast.success("Form son kayıtlı haline döndürüldü");
-  }
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!form.titleEdited.trim()) return toast.error("Ürün adı zorunludur");
     setSaving(true);
-
     try {
-      const payload = {
-        ...form,
-        titleEdited: form.titleEdited.trim(),
-        descriptionEdited: form.descriptionEdited.trim(),
-        brand: form.brand.trim(),
-        sku: form.sku.trim(),
-        salePriceEdited: form.salePriceEdited.trim(),
-      };
-
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data?.error ?? "Kaydetme sırasında hata oluştu");
-        setSaving(false);
-        return;
-      }
-
-      toast.success("Ürün başarıyla kaydedildi");
+      if (!res.ok) throw new Error(data?.error ?? "Ürün kaydedilemedi");
+      toast.success("Ürün kaydedildi");
       router.refresh();
     } catch (error) {
-      console.error(error);
-      toast.error("Beklenmeyen bir hata oluştu");
+      toast.error(error instanceof Error ? error.message : "Ürün kaydedilemedi");
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <section className="rounded-[26px] border border-gray-200 bg-gray-50 p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
-              Düzenleme Özeti
-            </p>
-            <h3 className="mt-1 text-base font-semibold text-gray-900">
-              Tam genişlikte edit deneyimi
-            </h3>
+    <form onSubmit={submit} className="space-y-5">
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={() => setForm(initialForm)} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700">Geri Al</button>
+        <button disabled={saving} className="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{saving ? "Kaydediliyor..." : "Kaydet"}</button>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section className="space-y-4 rounded-[26px] border border-gray-200 bg-gray-50 p-4">
+          <h3 className="font-semibold text-gray-900">Ürün bilgileri</h3>
+          <label className="block text-sm font-medium text-gray-800">Ürün adı<input className={inputClass} value={form.titleEdited} onChange={(e) => setField("titleEdited", e.target.value)} /></label>
+          <label className="block text-sm font-medium text-gray-800">Açıklama<textarea rows={10} className={inputClass} value={form.descriptionEdited} onChange={(e) => setField("descriptionEdited", e.target.value)} /></label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-gray-800">Marka<input className={inputClass} value={form.brand} onChange={(e) => setField("brand", e.target.value)} /></label>
+            <label className="text-sm font-medium text-gray-800">Kategori<input className={inputClass} value={form.categoryName} onChange={(e) => setField("categoryName", e.target.value)} /></label>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-3 py-2 text-xs font-semibold ${
-                dirty
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {dirty ? "Kaydedilmemiş değişiklik var" : "Tüm değişiklikler kayıtlı"}
-            </span>
-
-            <button
-              type="button"
-              onClick={resetAll}
-              disabled={saving || !dirty}
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Geri Al
-            </button>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Kaydediliyor..." : "Kaydet"}
-            </button>
+          <label className="block text-sm font-medium text-gray-800">Yerel kategori ID<input className={inputClass} value={form.localCategoryId} onChange={(e) => setField("localCategoryId", e.target.value)} /></label>
+        </section>
+        <section className="space-y-4 rounded-[26px] border border-gray-200 bg-gray-50 p-4">
+          <h3 className="font-semibold text-gray-900">Stok ve ticari bilgiler</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-gray-800">SKU<input className={inputClass} value={form.sku} onChange={(e) => setField("sku", e.target.value)} /></label>
+            <label className="text-sm font-medium text-gray-800">Barkod<input className={inputClass} value={form.barcode} onChange={(e) => setField("barcode", e.target.value)} /></label>
+            <label className="text-sm font-medium text-gray-800">Stok<input type="number" min="0" className={inputClass} value={form.stock} onChange={(e) => setField("stock", e.target.value)} /></label>
+            <label className="text-sm font-medium text-gray-800">Fiyat<input type="number" min="0" step="0.01" className={inputClass} value={form.salePriceEdited} onChange={(e) => setField("salePriceEdited", e.target.value)} /></label>
+            <label className="text-sm font-medium text-gray-800">Para birimi<input className={inputClass} value={form.currency} onChange={(e) => setField("currency", e.target.value.toUpperCase())} /></label>
+            <label className="text-sm font-medium text-gray-800">KDV oranı<input type="number" min="0" step="0.01" className={inputClass} value={form.vatRateEdited} onChange={(e) => setField("vatRateEdited", e.target.value)} /></label>
           </div>
-        </div>
-      </section>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <div className="space-y-5">
-          <section className="rounded-[26px] border border-gray-200 bg-white p-4">
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
-                Başlık
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-gray-900">
-                Ürün adı düzenleme
-              </h3>
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-                  Kaynak başlık
-                </div>
-                <p className="mt-2 text-sm leading-6 text-gray-700">
-                  {product.titleSource || "-"}
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-800">
-                  Düzenlenmiş başlık
-                </label>
-                <textarea
-                  rows={4}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
-                  value={form.titleEdited}
-                  onChange={(e) => setField("titleEdited", e.target.value)}
-                  placeholder={product.titleSource}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[26px] border border-gray-200 bg-white p-4">
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
-                Açıklama
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-gray-900">
-                İçerik düzenleme
-              </h3>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-                  Kaynak açıklama
-                </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                  {product.descriptionSource || "Kaynak açıklama yok"}
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-800">
-                  Düzenlenmiş açıklama
-                </label>
-                <textarea
-                  rows={12}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
-                  value={form.descriptionEdited}
-                  onChange={(e) => setField("descriptionEdited", e.target.value)}
-                  placeholder={product.descriptionSource ?? ""}
-                />
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="space-y-5">
-          <section className="rounded-[26px] border border-gray-200 bg-white p-4">
-            <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
-                Ticari Alanlar
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-gray-900">
-                Fiyat, marka, SKU, durum
-              </h3>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <label className="mb-2 block text-sm font-medium text-gray-800">
-                  Düzenlenmiş fiyat
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
-                  value={form.salePriceEdited}
-                  onChange={(e) => setField("salePriceEdited", e.target.value)}
-                  placeholder={
-                    product.salePriceSource != null
-                      ? String(product.salePriceSource)
-                      : ""
-                  }
-                />
-
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-                      Kaynak fiyat
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-gray-900">
-                      {product.salePriceSource != null
-                        ? `${formatPrice(product.salePriceSource)} ₺`
-                        : "-"}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-                      Fark
-                    </div>
-                    <div
-                      className={`mt-2 text-sm font-semibold ${
-                        priceDelta == null
-                          ? "text-gray-500"
-                          : priceDelta === 0
-                          ? "text-gray-500"
-                          : priceDelta > 0
-                          ? "text-amber-600"
-                          : "text-emerald-600"
-                      }`}
-                    >
-                      {priceDelta == null
-                        ? "-"
-                        : priceDelta === 0
-                        ? "Değişiklik yok"
-                        : `${priceDelta > 0 ? "+" : ""}${formatPrice(
-                            priceDelta
-                          )} ₺`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <label className="mb-2 block text-sm font-medium text-gray-800">
-                    Marka
-                  </label>
-                  <input
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
-                    value={form.brand}
-                    onChange={(e) => setField("brand", e.target.value)}
-                    placeholder="Marka gir"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <label className="mb-2 block text-sm font-medium text-gray-800">
-                    SKU
-                  </label>
-                  <input
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
-                    value={form.sku}
-                    onChange={(e) => setField("sku", e.target.value)}
-                    placeholder="SKU gir"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <label className="mb-2 block text-sm font-medium text-gray-800">
-                  Durum
-                </label>
-                <select
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
-                  value={form.status}
-                  onChange={(e) => setField("status", e.target.value)}
-                >
-                  <option value="draft">draft</option>
-                  <option value="ready">ready</option>
-                  <option value="exported">exported</option>
-                </select>
-              </div>
-            </div>
-          </section>
-        </div>
+          <label className="block text-sm font-medium text-gray-800">Durum<select className={inputClass} value={form.status} onChange={(e) => setField("status", e.target.value)}><option value="draft">Taslak</option><option value="ready">Hazır</option><option value="exported">Dışa aktarıldı</option></select></label>
+        </section>
       </div>
     </form>
   );

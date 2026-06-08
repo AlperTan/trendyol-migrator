@@ -12,15 +12,21 @@ type Product = {
   descriptionEdited: string | null;
   salePriceSource: number | null;
   salePriceEdited: number | null;
+  stock: number;
+  currency: string;
+  vatRateSource: number | null;
+  vatRateEdited: number | null;
   listPriceSource: number | null;
   brand: string | null;
   sku: string | null;
   barcode: string | null;
   categorySource: string | null;
+  categoryName: string | null;
+  localCategoryId: string | null;
   sourceStatus: string | null;
   status: string;
-  sourcePlatform: string;
-  sourceProductId: string;
+  sourcePlatform: string | null;
+  sourceProductId: string | null;
   images: {
     id: string;
     sourceUrl: string;
@@ -103,8 +109,8 @@ function getDeltaLabel(source: number | null, edited: number | null) {
 }
 
 function getSourceProductUrl(
-  sourcePlatform: string,
-  sourceProductId: string
+  sourcePlatform: string | null,
+  sourceProductId: string | null
 ): string | null {
   if (sourcePlatform === "trendyol" && sourceProductId) {
     return `https://www.trendyol.com/product-p-${sourceProductId}`;
@@ -229,7 +235,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     </div>
 
                     <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500">
-                      {product.sourcePlatform}
+                      {product.sourcePlatform ?? "local"}
                     </div>
                   </div>
 
@@ -239,7 +245,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                         Source Product ID
                       </div>
                       <div className="mt-2 break-all text-sm font-semibold text-gray-900">
-                        {product.sourceProductId}
+                        {product.sourceProductId ?? "Yerel ürün"}
                       </div>
 
                       {sourceProductUrl ? (
@@ -254,7 +260,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       ) : null}
                     </div>
 
-                    <DownloadImagesButton productId={product.id} />
+                    {product.sourcePlatform === "trendyol" ? (
+                      <DownloadImagesButton productId={product.id} />
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -325,7 +333,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       Kategori
                     </div>
                     <p className="mt-1 text-gray-800">
-                      {product.categorySource || "-"}
+                      {product.categoryName ?? product.categorySource ?? "-"}
                     </p>
                   </div>
                 </div>
@@ -368,7 +376,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       Kategori
                     </div>
                     <p className="mt-1 text-gray-800">
-                      {product.categorySource || "-"}
+                      {product.categoryName ?? product.categorySource ?? "-"}
                     </p>
                   </div>
                 </div>

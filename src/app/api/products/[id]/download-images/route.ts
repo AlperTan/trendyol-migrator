@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { cropWhiteMargins } from "@/lib/image-processing";
+import {
+  getProductImagePublicPath,
+  getProductStorageDir,
+} from "@/lib/product-storage";
 
 type RouteContext = {
   params: Promise<{
@@ -11,16 +16,6 @@ type RouteContext = {
 
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
-}
-
-function getFileExtensionFromUrl(url: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const ext = path.extname(pathname);
-    return ext || ".jpg";
-  } catch {
-    return ".jpg";
-  }
 }
 
 export async function POST(_: NextRequest, context: RouteContext) {
@@ -45,7 +40,7 @@ export async function POST(_: NextRequest, context: RouteContext) {
       );
     }
 
-    const baseDir = path.join(process.cwd(), "storage", "products", product.id);
+    const baseDir = getProductStorageDir(product.id);
     await ensureDir(baseDir);
 
     let downloaded = 0;
@@ -60,15 +55,14 @@ export async function POST(_: NextRequest, context: RouteContext) {
       const arrayBuffer = await res.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const ext = getFileExtensionFromUrl(image.sourceUrl);
-      const filename = `${String(image.sortOrder).padStart(2, "0")}${ext}`;
+      const processedBuffer = await cropWhiteMargins(buffer);
+
+      const filename = `${String(image.sortOrder).padStart(2, "0")}.jpg`;
       const fullPath = path.join(baseDir, filename);
 
-      await fs.writeFile(fullPath, buffer);
+      await fs.writeFile(fullPath, processedBuffer);
 
-      const relativePath = path
-        .join("storage", "products", product.id, filename)
-        .replaceAll("\\", "/");
+      const relativePath = getProductImagePublicPath(product.id, filename);
 
       await db.productImage.update({
         where: { id: image.id },

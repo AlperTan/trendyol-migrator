@@ -56,6 +56,7 @@ export default function ImageManager({
 
   const [images, setImages] = useState<ProductImage[]>(sortImages(initialImages));
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -182,6 +183,28 @@ export default function ImageManager({
     setSaving(false);
   }
 
+  async function uploadImages(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append("files", file));
+      const res = await fetch(`/api/products/${productId}/images/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Görseller yüklenemedi");
+      setImages((current) => sortImages([...current, ...(data.images ?? [])]));
+      router.refresh();
+      toast.success(`${data.images?.length ?? 0} görsel yüklendi`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Görseller yüklenemedi");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
       <div className="mb-5 flex flex-col gap-4 border-b border-gray-100 pb-5 md:flex-row md:items-center md:justify-between">
@@ -211,6 +234,20 @@ export default function ImageManager({
           >
             {saving ? "Kaydediliyor..." : "Görsel Ayarlarını Kaydet"}
           </button>
+          <label className="cursor-pointer rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+            {uploading ? "Yükleniyor..." : "Bilgisayardan Görsel Yükle"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              disabled={uploading}
+              onChange={(event) => {
+                void uploadImages(event.target.files);
+                event.target.value = "";
+              }}
+              className="hidden"
+            />
+          </label>
         </div>
       </div>
 

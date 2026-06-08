@@ -69,6 +69,7 @@ type BatchCheckResponse = {
 };
 
 const STATUS_OPTIONS = [
+  { key: "local", label: "Yerel", emoji: "L" },
   { key: "approved", label: "Approved", emoji: "✅" },
   { key: "archived", label: "Archived", emoji: "📦" },
   { key: "blacklisted", label: "Blacklisted", emoji: "⛔" },
@@ -105,7 +106,7 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["approved"]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["approved", "local"]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -277,7 +278,7 @@ export default function HomePage() {
   }
 
   function resetFilters() {
-    setSelectedStatuses(["approved"]);
+    setSelectedStatuses(["approved", "local"]);
     setSearchInput("");
     setSearchTerm("");
     setBrand("");
@@ -491,13 +492,18 @@ export default function HomePage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={importProducts}
-              className="rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
-            >
-              Trendyol’dan Ürün Çek
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/products/new" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Yeni Ürün
+              </Link>
+              <button
+                type="button"
+                onClick={importProducts}
+                className="rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+              >
+                Trendyol’dan Ürün Çek
+              </button>
+            </div>
           </div>
         </section>
 

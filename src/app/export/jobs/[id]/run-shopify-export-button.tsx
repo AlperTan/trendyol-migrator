@@ -13,18 +13,21 @@ export default function RunShopifyExportButton({
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
+  const [rerunCompleted, setRerunCompleted] = useState(false);
 
   async function runExport() {
     setRunning(true);
     try {
       const response = await fetch(`/api/export-jobs/${jobId}/run`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rerunCompleted }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error ?? "Shopify export failed");
 
       toast.success(
-        `Shopify export finished: ${data.summary?.completed ?? 0} completed, ${data.summary?.failed ?? 0} failed`
+        `Shopify export finished: ${data.completed ?? 0} completed, ${data.failed ?? 0} failed, ${data.skipped ?? 0} skipped`
       );
       router.refresh();
     } catch (error) {
@@ -35,13 +38,24 @@ export default function RunShopifyExportButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={runExport}
-      disabled={disabled || running}
-      className="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {running ? "Running Shopify Export..." : "Run Shopify Export"}
-    </button>
+    <div className="flex flex-col gap-2">
+      <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+        <input
+          type="checkbox"
+          checked={rerunCompleted}
+          onChange={(event) => setRerunCompleted(event.target.checked)}
+          disabled={disabled || running}
+        />
+        Rerun completed items
+      </label>
+      <button
+        type="button"
+        onClick={runExport}
+        disabled={disabled || running}
+        className="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {running ? "Running Shopify Export..." : "Run Shopify Export"}
+      </button>
+    </div>
   );
 }

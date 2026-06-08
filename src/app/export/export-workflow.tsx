@@ -8,7 +8,7 @@ import { toast } from "sonner";
 type Product = {
   id: string; titleSource: string; titleEdited: string | null; sku: string | null;
   barcode: string | null; salePriceSource: number | null; salePriceEdited: number | null;
-  stock: number; status: string; sourceStatus: string | null;
+  stock: number; currency: string; status: string; sourceStatus: string | null;
   images: Array<{ id: string; sourceUrl: string; localPath: string | null; isSelected: boolean }>;
 };
 type Account = { id: string; marketplace: string; name: string; isActive: boolean };
@@ -26,9 +26,10 @@ function validateProduct(product: Product): Warning {
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!displayTitle(product).trim()) errors.push("Missing title");
-  if (displayPrice(product) == null || Number(displayPrice(product)) < 0) errors.push("Missing price");
+  if (displayPrice(product) == null || Number(displayPrice(product)) <= 0) errors.push("Price must be greater than 0");
   if (!product.sku) warnings.push("Missing SKU");
   if (!product.images.some((image) => image.isSelected)) warnings.push("No selected/exportable image");
+  if (!["TRY", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"].includes(product.currency.toUpperCase())) warnings.push(`Uncommon currency: ${product.currency}`);
   return { productId: product.id, title: displayTitle(product), errors, warnings };
 }
 

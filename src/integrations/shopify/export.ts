@@ -1,128 +1,99 @@
-import type {
-  ExportResult,
-  MarketplaceAdapter,
-  ValidationResult,
-} from "@/core/marketplace";
+import type { ExportResult, MarketplaceAdapter, ValidationResult } from "@/core/marketplace";
 import type { NormalizedProduct } from "@/core/normalized-product";
 import { ShopifyClient } from "./client";
 import { mapProductToShopify } from "./mapper";
+import type { ShopifyExportOptions } from "./types";
 
-const CREATE_PRODUCT = `
-  mutation CreateProduct($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
-    productCreate(product: $product, media: $media) {
-      product {
-        id
-        title
-        variants(first: 1) {
-          nodes { id }
-        }
-      }
-      userErrors { field message }
-    }
-  }
-`;
+const PRODUCT_FIELDS = `id title variants(first: 1) { nodes { id } }`;
+const CREATE_PRODUCT = `mutation CreateProduct($product: ProductCreateInput!, $media: [CreateMediaInput!]) { productCreate(product: $product, media: $media) { product { ${PRODUCT_FIELDS} } userErrors { field message } } }`;
+const UPDATE_PRODUCT = `mutation UpdateProduct($product: ProductUpdateInput!) { productUpdate(product: $product) { product { ${PRODUCT_FIELDS} } userErrors { field message } } }`;
+const UPDATE_VARIANT = `mutation UpdateInitialVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) { productVariantsBulkUpdate(productId: $productId, variants: $variants) { productVariants { id barcode price inventoryItem { sku tracked } } userErrors { field message } } }`;
 
-const UPDATE_VARIANT = `
-  mutation UpdateInitialVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-      productVariants { id barcode price inventoryItem { sku tracked } }
-      userErrors { field message }
-    }
-  }
-`;
+type ShopifyProduct = { id: string; title: string; variants: { nodes: Array<{ id: string }> } };
+type CreateResponse = { productCreate: { product: ShopifyProduct | null } };
+type UpdateResponse = { productUpdate: { product: ShopifyProduct | null } };
+type VariantResponse = { productVariantsBulkUpdate: { productVariants: unknown[] } };
 
-type CreateProductResponse = {
-  productCreate: {
-    product: {
-      id: string;
-      title: string;
-      variants: { nodes: Array<{ id: string }> };
-    } | null;
-  };
-};
+const COMMON_CURRENCIES = new Set(["TRY", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]);
 
-type UpdateVariantResponse = {
-  productVariantsBulkUpdate: {
-    productVariants: Array<{
-      id: string;
-      barcode: string | null;
-      price: string;
-      inventoryItem: { sku: string | null; tracked: boolean };
-    }>;
-  };
-};
-
-export function validateShopifyProduct(
-  product: NormalizedProduct
-): ValidationResult {
+export function validateShopifyProduct(product: NormalizedProduct): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const payload = mapProductToShopify(product);
 
   if (!product.title.trim()) errors.push("Title is required");
-  if (product.price == null || product.price < 0) {
-    errors.push("A valid price is required");
+  if (product.price == null || product.price <= 0) errors.push("Price must be greater than 0");
+  if (!product.sku) warnings.push("SKU is missing");
+  if (!COMMON_CURRENCIES.has(product.currency.toUpperCase())) {
+    warnings.push(`Currency ${product.currency} is uncommon and will not be sent to Shopify`);
   }
-  if (!product.images.some((image) => image.selectedForExport)) {
-    warnings.push("No image is selected for export");
-  }
+  if (payload.media.length === 0) warnings.push("No exportable absolute image URL is available");
 
   return { valid: errors.length === 0, errors, warnings };
 }
 
 export async function exportProductToShopify(
-  product: NormalizedProduct
+  product: NormalizedProduct,
+  options: ShopifyExportOptions = {}
 ): Promise<ExportResult> {
   const client = new ShopifyClient();
   const payload = mapProductToShopify(product);
-  const createVariables = {
-    product: payload.product,
-    media: payload.media,
-  };
-  const created = await client.graphql<CreateProductResponse>(
-    CREATE_PRODUCT,
-    createVariables
-  );
-  const shopifyProduct = created.productCreate.product;
-
-  if (!shopifyProduct) {
-    throw new Error("Shopify productCreate returned no product");
-  }
-
-  const variantId = shopifyProduct.variants.nodes[0]?.id;
-  if (!variantId) {
-    throw new Error("Shopify productCreate returned no initial variant");
-  }
-
-  const variantVariables = {
-    productId: shopifyProduct.id,
-    variants: [{ id: variantId, ...payload.variant }],
-  };
-  const updated = await client.graphql<UpdateVariantResponse>(
-    UPDATE_VARIANT,
-    variantVariables
-  );
+  const action = options.externalProductId ? "updated" : "created";
   const warnings = [
     ...validateShopifyProduct(product).warnings,
     ...(payload.skippedImages.length
-      ? [
-          `${payload.skippedImages.length} local/private image URL(s) were skipped because Shopify cannot fetch them`,
-        ]
+      ? [`${payload.skippedImages.length} image URL(s) were skipped because Shopify cannot fetch them`]
       : []),
     ...(product.stock > 0
-      ? [
-          "Inventory quantity was not sent because a Shopify location ID is not configured",
-        ]
+      ? ["Inventory quantity was not sent because a Shopify location ID is not configured"]
       : []),
   ];
+
+  let shopifyProduct: ShopifyProduct | null;
+  let productVariables: Record<string, unknown>;
+
+  if (options.externalProductId) {
+    productVariables = {
+      product: { ...payload.product, id: options.externalProductId },
+    };
+    const response = await client.graphql<UpdateResponse>(UPDATE_PRODUCT, productVariables);
+    shopifyProduct = response.productUpdate.product;
+    if (payload.media.length) {
+      warnings.push("Images are not replaced during updates; existing Shopify media was kept");
+    }
+  } else {
+    productVariables = { product: payload.product, media: payload.media };
+    const response = await client.graphql<CreateResponse>(CREATE_PRODUCT, productVariables);
+    shopifyProduct = response.productCreate.product;
+  }
+
+  if (!shopifyProduct) throw new Error(`Shopify product ${action} returned no product`);
+
+  const variantId = shopifyProduct.variants.nodes[0]?.id;
+  let variantResponse: unknown = null;
+  const variantVariables = variantId
+    ? { productId: shopifyProduct.id, variants: [{ id: variantId, ...payload.variant }] }
+    : null;
+
+  if (!variantVariables) {
+    warnings.push("Shopify returned no initial variant; price, SKU, and barcode were not updated");
+  } else {
+    try {
+      variantResponse = await client.graphql<VariantResponse>(UPDATE_VARIANT, variantVariables);
+    } catch (error) {
+      warnings.push(`Variant update failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
 
   return {
     success: true,
     externalProductId: shopifyProduct.id,
     externalId: shopifyProduct.id,
-    requestPayload: { createVariables, variantVariables },
+    requestPayload: { action, productVariables, variantVariables },
     responsePayload: {
+      action,
       product: shopifyProduct,
-      variants: updated.productVariantsBulkUpdate.productVariants,
+      variantResponse,
       warnings,
       skippedImages: payload.skippedImages,
     },

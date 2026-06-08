@@ -1,12 +1,26 @@
 import type { NormalizedProduct } from "@/core/normalized-product";
 import type { ShopifyProductPayload } from "./types";
 
-function isPublicImageUrl(value: string) {
+function absoluteImageUrl(value: string): string | null {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : null;
   } catch {
-    return false;
+    const publicBaseUrl = process.env.PUBLIC_BASE_URL?.trim();
+    if (!publicBaseUrl || !value.startsWith("/")) return null;
+
+    try {
+      const url = new URL(
+        `${publicBaseUrl.replace(/\/+$/, "")}/${value.replace(/^\/+/, "")}`
+      );
+      return url.protocol === "https:" || url.protocol === "http:"
+        ? url.toString()
+        : null;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -16,9 +30,10 @@ export function mapProductToShopify(
   const selectedImages = product.images.filter(
     (image) => image.selectedForExport
   );
-  const publicImages = selectedImages.filter((image) =>
-    isPublicImageUrl(image.url)
-  );
+  const resolvedImages = selectedImages.map((image) => ({
+    original: image.url,
+    absolute: absoluteImageUrl(image.url),
+  }));
 
   return {
     product: {
@@ -41,13 +56,13 @@ export function mapProductToShopify(
         ? { inventoryItem: { sku: product.sku, tracked: false } }
         : {}),
     },
-    media: publicImages.map((image) => ({
+    media: resolvedImages.filter((image) => image.absolute).map((image) => ({
       mediaContentType: "IMAGE",
-      originalSource: image.url,
+      originalSource: image.absolute as string,
       alt: product.title,
     })),
-    skippedImages: selectedImages
-      .filter((image) => !isPublicImageUrl(image.url))
-      .map((image) => image.url),
+    skippedImages: resolvedImages
+      .filter((image) => !image.absolute)
+      .map((image) => image.original),
   };
 }

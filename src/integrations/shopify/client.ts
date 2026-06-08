@@ -28,10 +28,21 @@ function getShopifyConfig() {
     throw new ShopifyGraphqlError("SHOPIFY_ADMIN_ACCESS_TOKEN is missing");
   }
 
+  const domain = normalizeShopifyDomain(storeDomain);
   return {
-    endpoint: `https://${storeDomain.replace(/^https?:\/\//, "").replace(/\/+$/, "")}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
+    endpoint: `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
     accessToken,
   };
+}
+
+function normalizeShopifyDomain(value: string) {
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    if (!url.hostname) throw new Error();
+    return url.hostname;
+  } catch {
+    throw new ShopifyGraphqlError("SHOPIFY_STORE_DOMAIN is invalid");
+  }
 }
 
 function findUserErrors(value: unknown): ShopifyUserError[] {
@@ -103,4 +114,13 @@ export class ShopifyClient {
   graphql<T>(query: string, variables: Record<string, unknown>) {
     return shopifyGraphql<T>(query, variables);
   }
+}
+
+export function getShopifyAdminProductUrl(externalProductId: string) {
+  const storeDomain = process.env.SHOPIFY_STORE_DOMAIN?.trim();
+  const numericId = externalProductId.match(/(\d+)$/)?.[1];
+  if (!storeDomain || !numericId) return null;
+
+  const domain = normalizeShopifyDomain(storeDomain);
+  return `https://${domain}/admin/products/${numericId}`;
 }

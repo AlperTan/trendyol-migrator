@@ -1,4 +1,5 @@
-export type ShopifyProductCreateInput = {
+export type ShopifyProductInput = {
+  id?: string;
   title: string;
   descriptionHtml?: string;
   vendor?: string;
@@ -24,10 +25,14 @@ export type ShopifyMediaInput = {
 };
 
 export type ShopifyProductPayload = {
-  product: ShopifyProductCreateInput;
+  product: ShopifyProductInput;
   variant: Omit<ShopifyVariantUpdateInput, "id">;
   media: ShopifyMediaInput[];
   skippedImages: string[];
+};
+
+export type ShopifyExportOptions = {
+  externalProductId?: string | null;
 };
 
 export type ShopifyUserError = {

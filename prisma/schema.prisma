@@ -7,9 +7,9 @@ datasource db {
 }
 
 model Product {
-  id                     String         @id @default(cuid())
+  id                     String               @id @default(cuid())
   sourcePlatform         String?
-  sourceProductId        String?        @unique
+  sourceProductId        String?              @unique
   contentId              String?
   sourceStatus           String?
   titleSource            String
@@ -18,8 +18,8 @@ model Product {
   descriptionEdited      String?
   salePriceSource        Float?
   salePriceEdited        Float?
-  stock                  Int            @default(0)
-  currency               String         @default("TRY")
+  stock                  Int                  @default(0)
+  currency               String               @default("TRY")
   listPriceSource        Float?
   deliveryDurationSource Int?
   deliveryDurationEdited Int?
@@ -37,10 +37,12 @@ model Product {
   cargoCompanyId         Int?
   shipmentAddressId      Int?
   returningAddressId     Int?
-  status                 String         @default("draft")
+  status                 String               @default("draft")
   images                 ProductImage[]
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  marketplaceProducts    MarketplaceProduct[]
+  exportJobItems         ExportJobItem[]
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 }
 
 model ProductImage {
@@ -54,4 +56,125 @@ model ProductImage {
   createdAt      DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+enum Marketplace {
+  trendyol
+  shopify
+  n11
+  hepsiburada
+  pttavm
+  amazon
+}
+
+enum ExportJobStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum ExportJobItemStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+}
+
+enum MarketplaceProductStatus {
+  linked
+  exported
+  failed
+  archived
+}
+
+model MarketplaceAccount {
+  id                  String               @id @default(cuid())
+  marketplace         Marketplace
+  name                String
+  credentialsJson     Json
+  isActive            Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  marketplaceProducts MarketplaceProduct[]
+  exportJobs          ExportJob[]
+
+  @@unique([marketplace, name])
+}
+
+model MarketplaceProduct {
+  id                   String                   @id @default(cuid())
+  productId            String
+  product              Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  marketplace          Marketplace
+  marketplaceAccountId String?
+  marketplaceAccount   MarketplaceAccount?      @relation(fields: [marketplaceAccountId], references: [id], onDelete: SetNull)
+  externalProductId    String?
+  externalSku          String?
+  status               MarketplaceProductStatus @default(linked)
+  lastExportedAt       DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  @@index([productId, marketplace, marketplaceAccountId])
+  @@index([marketplace, status])
+}
+
+model ExportJob {
+  id                   String              @id @default(cuid())
+  targetMarketplace    Marketplace
+  marketplaceAccountId String?
+  marketplaceAccount   MarketplaceAccount? @relation(fields: [marketplaceAccountId], references: [id], onDelete: SetNull)
+  status               ExportJobStatus     @default(pending)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  items                ExportJobItem[]
+
+  @@index([targetMarketplace, status])
+}
+
+model ExportJobItem {
+  id               String              @id @default(cuid())
+  exportJobId      String
+  exportJob        ExportJob           @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  status           ExportJobItemStatus @default(pending)
+  targetExternalId String?
+  requestPayload   Json?
+  responsePayload  Json?
+  errorMessage     String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([exportJobId, status])
+  @@index([productId])
+}
+
+model CategoryMapping {
+  id                     String      @id @default(cuid())
+  localCategoryId        String?
+  localCategoryName      String?
+  marketplace            Marketplace
+  targetCategoryId       String
+  targetCategoryName     String?
+  requiredAttributesJson Json?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  @@index([marketplace, localCategoryId])
+}
+
+model AttributeMapping {
+  id                  String      @id @default(cuid())
+  marketplace         Marketplace
+  localAttributeName  String
+  targetAttributeName String
+  targetAttributeId   String?
+  valueMappingJson    Json?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([marketplace, localAttributeName])
 }

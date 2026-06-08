@@ -1,7 +1,7 @@
 import type { Marketplace } from "./marketplace";
 
 export type ExportJobStatus = "pending" | "running" | "completed" | "failed";
-export type ExportJobItemStatus = ExportJobStatus;
+export type ExportJobItemStatus = ExportJobStatus | "skipped";
 
 export type ExportJob = {
   id: string;

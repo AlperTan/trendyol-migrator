@@ -19,6 +19,7 @@ export type ValidationResult = {
 
 export type ExportResult = {
   success: boolean;
+  externalProductId?: string;
   externalId?: string;
   requestPayload?: unknown;
   responsePayload?: unknown;

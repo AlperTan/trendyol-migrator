@@ -19,6 +19,10 @@ export function optionalJson(value: unknown): Prisma.InputJsonValue | undefined 
   return value == null ? undefined : (value as Prisma.InputJsonValue);
 }
 
+export function toInputJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
 export function maskCredentials(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(() => "[REDACTED]");

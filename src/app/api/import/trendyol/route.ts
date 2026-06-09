@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import {
   fetchAllProducts,
   fetchCategoryIdsByBarcodes,
   fetchProductBaseInfoByBarcode,
+  type TrendyolProductRecord,
 } from "@/lib/trendyol";
+import { logProductActivity } from "@/lib/product-activity";
 
 function pickNumber(...values: unknown[]): number | null {
   for (const value of values) {
@@ -51,8 +53,12 @@ function pickString(...values: unknown[]): string | null {
   return null;
 }
 
-function normalizeImages(item: any): string[] {
-  if (!Array.isArray(item?.images)) {
+function isRecord(value: unknown): value is TrendyolProductRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeImages(item: TrendyolProductRecord): string[] {
+  if (!Array.isArray(item.images)) {
     return [];
   }
 
@@ -65,8 +71,7 @@ function normalizeImages(item: any): string[] {
     }
 
     if (
-      image &&
-      typeof image === "object" &&
+      isRecord(image) &&
       typeof image.url === "string" &&
       image.url.trim()
     ) {
@@ -77,14 +82,20 @@ function normalizeImages(item: any): string[] {
   return Array.from(new Set(urls));
 }
 
-function pickDeliveryDuration(item: any): number | null {
+function pickDeliveryDuration(item: TrendyolProductRecord): number | null {
+  const deliveryOption = isRecord(item.deliveryOption)
+    ? item.deliveryOption
+    : null;
   return pickInteger(
-    item?.deliveryDuration,
-    item?.deliveryOption?.deliveryDuration
+    item.deliveryDuration,
+    deliveryOption?.deliveryDuration
   );
 }
 
-function mergeMissingFields(item: any, baseInfo: any | null) {
+function mergeMissingFields(
+  item: TrendyolProductRecord,
+  baseInfo: TrendyolProductRecord | null
+): TrendyolProductRecord {
   if (!baseInfo) return item;
 
   return {
@@ -108,8 +119,8 @@ function mergeMissingFields(item: any, baseInfo: any | null) {
   };
 }
 
-async function enrichByBarcode(item: any) {
-  const barcode = pickString(item?.barcode);
+async function enrichByBarcode(item: TrendyolProductRecord) {
+  const barcode = pickString(item.barcode);
   if (!barcode) {
     return item;
   }
@@ -126,7 +137,7 @@ async function enrichByBarcode(item: any) {
   }
 }
 
-async function upsertItems(items: any[], forcedStatus?: string) {
+async function upsertItems(items: TrendyolProductRecord[], forcedStatus?: string) {
   const enrichedItems = await Promise.all(items.map((item) => enrichByBarcode(item)));
 
   const barcodes = enrichedItems
@@ -144,7 +155,7 @@ async function upsertItems(items: any[], forcedStatus?: string) {
         ? Number(barcodeCategories[barcode].id)
         : null;
 
-    const item = {
+    const item: TrendyolProductRecord = {
       ...rawItem,
       categoryId: rawItem?.categoryId ?? fallbackCategoryId,
       categoryName:
@@ -175,8 +186,8 @@ async function upsertItems(items: any[], forcedStatus?: string) {
     const deliveryDuration = pickDeliveryDuration(item);
 
     const contentId = pickString(item?.contentId);
-    const titleSource = item?.title ?? "";
-    const descriptionSource = item?.description ?? null;
+    const titleSource = pickString(item.title) ?? "";
+    const descriptionSource = pickString(item.description);
     const brand = pickString(item?.brand, item?.brandName);
     const brandId = pickInteger(item?.brandId);
     const categorySource = pickString(item?.categoryName, item?.pimCategoryName);
@@ -199,6 +210,10 @@ async function upsertItems(items: any[], forcedStatus?: string) {
       deliveryDuration,
     });
 
+    const existingProduct = await db.product.findUnique({
+      where: { sourceProductId: String(item?.id) },
+      select: { id: true },
+    });
     const product = await db.product.upsert({
       where: {
         sourceProductId: String(item?.id),
@@ -268,10 +283,16 @@ async function upsertItems(items: any[], forcedStatus?: string) {
         })),
       });
     }
+    await logProductActivity({
+      productId: product.id,
+      type: existingProduct ? "product_edited" : "product_created",
+      message: existingProduct ? "Product updated from Trendyol import" : "Product created from Trendyol import",
+      metadata: { sourcePlatform: "trendyol" },
+    });
   }
 }
 
-export async function POST(_: NextRequest) {
+export async function POST() {
   try {
     const supplierId = process.env.TRENDYOL_SUPPLIER_ID;
     const apiKey = process.env.TRENDYOL_API_KEY;

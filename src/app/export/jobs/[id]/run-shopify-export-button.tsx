@@ -7,9 +7,11 @@ import { toast } from "sonner";
 export default function RunShopifyExportButton({
   jobId,
   disabled,
+  marketplace = "shopify",
 }: {
   jobId: string;
   disabled: boolean;
+  marketplace?: "shopify" | "trendyol";
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -24,14 +26,14 @@ export default function RunShopifyExportButton({
         body: JSON.stringify({ rerunCompleted }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error ?? "Shopify export failed");
+      if (!response.ok) throw new Error(data?.error ?? `${marketplace} export failed`);
 
       toast.success(
-        `Shopify export finished: ${data.completed ?? 0} completed, ${data.failed ?? 0} failed, ${data.skipped ?? 0} skipped`
+        `${marketplace} export finished: ${data.completed ?? 0} completed, ${data.failed ?? 0} failed, ${data.skipped ?? 0} skipped`
       );
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Shopify export failed");
+      toast.error(error instanceof Error ? error.message : `${marketplace} export failed`);
     } finally {
       setRunning(false);
     }
@@ -54,7 +56,7 @@ export default function RunShopifyExportButton({
         disabled={disabled || running}
         className="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {running ? "Running Shopify Export..." : "Run Shopify Export"}
+        {running ? `Running ${marketplace} Export...` : `Run ${marketplace} Export`}
       </button>
     </div>
   );

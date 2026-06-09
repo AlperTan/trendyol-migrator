@@ -7,42 +7,67 @@ datasource db {
 }
 
 model Product {
-  id                     String               @id @default(cuid())
-  sourcePlatform         String?
-  sourceProductId        String?              @unique
-  contentId              String?
-  sourceStatus           String?
-  titleSource            String
-  titleEdited            String?
-  descriptionSource      String?
-  descriptionEdited      String?
-  salePriceSource        Float?
-  salePriceEdited        Float?
-  stock                  Int                  @default(0)
-  currency               String               @default("TRY")
-  listPriceSource        Float?
-  deliveryDurationSource Int?
-  deliveryDurationEdited Int?
-  vatRateSource          Float?
-  vatRateEdited          Float?
-  brand                  String?
-  brandId                Int?
-  sku                    String?
-  barcode                String?
-  categorySource         String?
-  categoryName           String?
-  categoryId             Int?
-  localCategoryId        String?
-  productMainId          String?
-  cargoCompanyId         Int?
-  shipmentAddressId      Int?
-  returningAddressId     Int?
-  status                 String               @default("draft")
-  images                 ProductImage[]
-  marketplaceProducts    MarketplaceProduct[]
-  exportJobItems         ExportJobItem[]
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  id                          String               @id @default(cuid())
+  sourcePlatform              String?
+  sourceProductId             String?              @unique
+  contentId                   String?
+  sourceStatus                String?
+  titleSource                 String
+  titleEdited                 String?
+  descriptionSource           String?
+  descriptionEdited           String?
+  salePriceSource             Float?
+  salePriceEdited             Float?
+  stock                       Int                  @default(0)
+  currency                    String               @default("TRY")
+  listPriceSource             Float?
+  deliveryDurationSource      Int?
+  deliveryDurationEdited      Int?
+  vatRateSource               Float?
+  vatRateEdited               Float?
+  brand                       String?
+  brandId                     Int?
+  sku                         String?
+  barcode                     String?
+  categorySource              String?
+  categoryName                String?
+  categoryId                  Int?
+  localCategoryId             String?
+  attributesJson              Json?
+  productMainId               String?
+  cargoCompanyId              Int?
+  shipmentAddressId           Int?
+  returningAddressId          Int?
+  suggestedBrandId            Int?
+  suggestedBrandConfidence    Float?
+  suggestedCategoryId         Int?
+  suggestedCategoryConfidence Float?
+  status                      String               @default("draft")
+  images                      ProductImage[]
+  marketplaceProducts         MarketplaceProduct[]
+  exportJobItems              ExportJobItem[]
+  activities                  ProductActivity[]
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+}
+
+model ProductActivity {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type         String
+  message      String
+  metadataJson Json?
+  createdAt    DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([type, createdAt])
+}
+
+model DuplicateExclusion {
+  id        String   @id @default(cuid())
+  pairKey   String   @unique
+  createdAt DateTime @default(now())
 }
 
 model ProductImage {
@@ -177,4 +202,60 @@ model AttributeMapping {
   updatedAt           DateTime    @updatedAt
 
   @@index([marketplace, localAttributeName])
+}
+
+model MarketplaceCategoryCache {
+  id          String      @id @default(cuid())
+  marketplace Marketplace
+  externalId  String
+  name        String
+  parentId    String?
+  rawPayload  Json
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([marketplace, externalId])
+  @@index([marketplace, name])
+}
+
+model MarketplaceBrandCache {
+  id          String      @id @default(cuid())
+  marketplace Marketplace
+  externalId  String
+  name        String
+  parentId    String?
+  rawPayload  Json
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([marketplace, externalId])
+  @@index([marketplace, name])
+}
+
+model MarketplaceAttributeCache {
+  id          String      @id @default(cuid())
+  marketplace Marketplace
+  externalId  String
+  name        String
+  parentId    String?
+  rawPayload  Json
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([marketplace, externalId, parentId])
+  @@index([marketplace, parentId])
+}
+
+model ProductTemplate {
+  id                      String      @id @default(cuid())
+  name                    String
+  marketplace             Marketplace
+  categoryId              String?
+  categoryName            String?
+  defaultAttributes       Json?
+  defaultVatRate          Float?
+  defaultCargoCompanyId   Int?
+  defaultDeliveryDuration Int?
+  defaultBrandId          Int?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  @@unique([marketplace, name])
 }

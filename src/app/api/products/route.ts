@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { buildProductReadiness } from "@/lib/product-readiness";
+import { logProductActivity, parseProductStatus } from "@/lib/product-activity";
 
 const ALLOWED_STATUSES = ["approved", "archived", "blacklisted", "unknown", "local"];
 
@@ -102,7 +104,6 @@ export async function GET(req: NextRequest) {
         orderBy: {
           sortOrder: "asc",
         },
-        take: 1,
       },
     },
   });
@@ -114,7 +115,16 @@ export async function GET(req: NextRequest) {
   const total = filtered.length;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
-  const items = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const [categoryMappings, cachedCategories, cachedBrands] = await Promise.all([
+    db.categoryMapping.findMany({ where: { marketplace: "trendyol" } }),
+    db.marketplaceCategoryCache.findMany({ where: { marketplace: "trendyol" }, select: { externalId: true, name: true } }),
+    db.marketplaceBrandCache.findMany({ where: { marketplace: "trendyol" }, select: { externalId: true, name: true } }),
+  ]);
+  const items = pageItems.map((product) => ({
+    ...product,
+    readiness: buildProductReadiness(product, categoryMappings, { categories: cachedCategories, brands: cachedBrands }).readiness,
+  }));
 
   console.log(
   "PRODUCTS API SAMPLE",
@@ -214,8 +224,13 @@ export async function POST(req: NextRequest) {
         barcode: nullableString(body.barcode),
         categoryName: nullableString(body.categoryName),
         localCategoryId: nullableString(body.localCategoryId),
-        status: nullableString(body.status) ?? "draft",
+        status: parseProductStatus(body.status) ?? "draft",
       },
+    });
+    await logProductActivity({
+      productId: product.id,
+      type: "product_created",
+      message: "Product created",
     });
 
     return NextResponse.json(product, { status: 201 });

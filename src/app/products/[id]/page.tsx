@@ -3,6 +3,9 @@ import Link from "next/link";
 import DownloadImagesButton from "./download-images-button";
 import ImageManager from "./image-manager";
 import ProductForm from "./product-form";
+import ReadinessBadge from "@/components/readiness-badge";
+import ProductActivityTimeline from "@/components/product-activity-timeline";
+import type { MarketplaceReadiness } from "@/core/readiness";
 
 type Product = {
   id: string;
@@ -34,6 +37,13 @@ type Product = {
     downloadStatus: string | null;
     sortOrder: number;
     isSelected: boolean;
+  }[];
+  readiness: MarketplaceReadiness;
+  activities: {
+    id: string;
+    type: string;
+    message: string;
+    createdAt: string;
   }[];
 };
 
@@ -89,6 +99,11 @@ function getStatusBadge(status: string | null) {
       return {
         label: "Draft",
         className: "bg-gray-100 text-gray-700 border-gray-200",
+      };
+    case "needs_review":
+      return {
+        label: "Needs review",
+        className: "bg-rose-50 text-rose-700 border-rose-200",
       };
     default:
       return {
@@ -291,8 +306,23 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
           </section>
         </div>
+        <section className="mb-6 rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+          <h2 className="text-xl font-semibold text-gray-900">Hazırlık Durumu</h2>
+          <p className="mt-2 text-sm text-gray-500">Dışa aktarım işi oluşturmadan önce eksik bilgileri giderin.</p>
+          <div className="mt-4 flex flex-wrap gap-4">
+            <ReadinessBadge marketplace="Shopify" readiness={product.readiness.shopify} />
+            <ReadinessBadge marketplace="Trendyol" readiness={product.readiness.trendyol} />
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {(["shopify", "trendyol"] as const).map((marketplace) => {
+              const readiness = product.readiness[marketplace];
+              return <div key={marketplace} className="rounded-2xl bg-gray-50 p-4"><div className="font-semibold capitalize text-gray-900">{marketplace} · Puan %{readiness.score}</div>{readiness.errors.map((error) => <div key={error} className="mt-2 text-sm text-rose-700">Engel: {error}</div>)}{readiness.warnings.map((warning) => <div key={warning} className="mt-2 text-sm text-amber-700">Uyarı: {warning}</div>)}</div>;
+            })}
+          </div>
+        </section>
         <ImageManager productId={product.id} initialImages={product.images} />
         <div className="space-y-6">
+          <ProductActivityTimeline activities={product.activities} />
           <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6">
             <div className="mb-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">

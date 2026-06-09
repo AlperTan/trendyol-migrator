@@ -1,0 +1,4 @@
+type Activity = { id: string; type: string; message: string; createdAt: string | Date };
+export default function ProductActivityTimeline({ activities }: { activities: Activity[] }) {
+  return <section className="rounded-[30px] border border-gray-200 bg-white p-5 shadow-sm md:p-6"><h2 className="text-xl font-semibold text-gray-900">Aktivite Geçmişi</h2><div className="mt-5 space-y-4">{activities.length ? activities.map((activity) => <div key={activity.id} className="border-l-2 border-gray-200 pl-4"><div className="text-sm font-semibold text-gray-900">{activity.message}</div><div className="mt-1 text-xs text-gray-500">{activity.type.replaceAll("_", " ")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(activity.createdAt))}</div></div>) : <p className="text-sm text-gray-500">Henüz aktivite kaydı yok.</p>}</div></section>;
+}

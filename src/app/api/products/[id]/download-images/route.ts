@@ -7,6 +7,7 @@ import {
   getProductImagePublicPath,
   getProductStorageDir,
 } from "@/lib/product-storage";
+import { logProductActivity } from "@/lib/product-activity";
 
 type RouteContext = {
   params: Promise<{
@@ -96,6 +97,14 @@ export async function POST(_: NextRequest, context: RouteContext) {
           error: error instanceof Error ? error.message : "Unknown image error",
         });
       }
+    }
+    if (downloaded > 0) {
+      await logProductActivity({
+        productId: product.id,
+        type: "image_processed",
+        message: `${downloaded} image(s) downloaded and processed`,
+        metadata: { downloaded, processed, skipped },
+      });
     }
 
     return NextResponse.json({

@@ -1,0 +1,10 @@
+"use client";
+import { useState } from "react";
+import BulkProductActions from "@/components/bulk-product-actions";
+
+type Product = { id: string; title: string; missingFields: string[]; suggestions: { brandId: number | null; brandConfidence: number | null; categoryId: number | null; categoryConfidence: number | null } };
+export default function MissingDataClient({ products }: { products: Product[] }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const groups = [["Eksik Kategori", "categoryId"], ["Eksik Marka", "brandId"], ["Eksik Barkod", "barcode"], ["Eksik Özellikler", "attributes"]] as const;
+  return <div className="space-y-6"><section className="rounded-[28px] border bg-white p-5 shadow-sm"><h2 className="font-semibold">Seçili Ürünleri Düzelt</h2><div className="mt-3"><BulkProductActions productIds={selected} onDone={() => location.reload()} /></div></section>{groups.map(([label, field]) => { const items = products.filter((product) => product.missingFields.includes(field)); return <section key={field} className="rounded-[28px] border bg-white p-5 shadow-sm"><h2 className="text-lg font-semibold">{label} <span className="text-gray-400">({items.length})</span></h2><div className="mt-3 space-y-2">{items.map((product) => <label key={product.id} className="flex items-center justify-between rounded-xl bg-gray-50 p-3"><span><input type="checkbox" checked={selected.includes(product.id)} onChange={() => setSelected((current) => current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id])} className="mr-3" />{product.title}</span><span className="text-xs text-gray-500">{field === "brandId" && product.suggestions.brandId ? `Önerilen marka ${product.suggestions.brandId} (%${Math.round((product.suggestions.brandConfidence ?? 0) * 100)})` : field === "categoryId" && product.suggestions.categoryId ? `Önerilen kategori ${product.suggestions.categoryId} (%${Math.round((product.suggestions.categoryConfidence ?? 0) * 100)})` : ""}</span></label>)}</div></section>; })}</div>;
+}

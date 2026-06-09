@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { processProductImage } from "@/lib/image-processing";
+import { logProductActivity } from "@/lib/product-activity";
 import {
   getProductImagePublicPath,
   getProductStorageDir,
@@ -94,6 +95,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
           error: error instanceof Error ? error.message : "Unknown image error",
         });
       }
+    }
+    if (created.length > 0) {
+      await logProductActivity({
+        productId,
+        type: processed > 0 ? "image_processed" : "image_uploaded",
+        message: `${created.length} image(s) uploaded${processed > 0 ? `, ${processed} processed` : ""}`,
+        metadata: { uploaded: created.length, processed, skipped },
+      });
     }
 
     return NextResponse.json(

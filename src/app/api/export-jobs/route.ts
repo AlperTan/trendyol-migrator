@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import { buildProductReadiness } from "@/lib/product-readiness";
 import {
   errorResponseMessage,
   optionalString,
   parseMarketplace,
 } from "@/lib/marketplace-api";
+import { logManyProductActivities } from "@/lib/product-activity";
 
 function parseProductIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     const products = await db.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true },
+      include: { images: { orderBy: { sortOrder: "asc" } } },
     });
     const foundIds = new Set(products.map((product) => product.id));
     const missingProductIds = productIds.filter((id) => !foundIds.has(id));
@@ -77,6 +79,33 @@ export async function POST(req: NextRequest) {
         { error: "Some products do not exist", missingProductIds },
         { status: 400 }
       );
+    }
+
+    if (targetMarketplace === "shopify" || targetMarketplace === "trendyol") {
+      const [categoryMappings, categories, brands] = await Promise.all([
+        db.categoryMapping.findMany({ where: { marketplace: "trendyol" } }),
+        db.marketplaceCategoryCache.findMany({ where: { marketplace: "trendyol" }, select: { externalId: true, name: true } }),
+        db.marketplaceBrandCache.findMany({ where: { marketplace: "trendyol" }, select: { externalId: true, name: true } }),
+      ]);
+      const blockedProducts = products
+        .map((product) => {
+          const readiness = buildProductReadiness(product, categoryMappings, { categories, brands }).readiness[
+            targetMarketplace
+          ];
+          return {
+            productId: product.id,
+            title: product.titleEdited ?? product.titleSource,
+            errors: readiness.errors,
+          };
+        })
+        .filter((product) => product.errors.length > 0);
+
+      if (blockedProducts.length > 0) {
+        return NextResponse.json(
+          { error: "Some products are not ready for export", blockedProducts },
+          { status: 400 }
+        );
+      }
     }
 
     const job = await db.exportJob.create({
@@ -94,6 +123,12 @@ export async function POST(req: NextRequest) {
         _count: { select: { items: true } },
       },
     });
+    await logManyProductActivities(
+      productIds,
+      "export_created",
+      `${targetMarketplace} export job created`,
+      { exportJobId: job.id, marketplace: targetMarketplace }
+    );
 
     return NextResponse.json(job, { status: 201 });
   } catch (error) {

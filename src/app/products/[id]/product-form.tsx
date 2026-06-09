@@ -105,7 +105,7 @@ export default function ProductForm({ product }: { product: Product }) {
             <label className="text-sm font-medium text-gray-800">Para birimi<input className={inputClass} value={form.currency} onChange={(e) => setField("currency", e.target.value.toUpperCase())} /></label>
             <label className="text-sm font-medium text-gray-800">KDV oranı<input type="number" min="0" step="0.01" className={inputClass} value={form.vatRateEdited} onChange={(e) => setField("vatRateEdited", e.target.value)} /></label>
           </div>
-          <label className="block text-sm font-medium text-gray-800">Durum<select className={inputClass} value={form.status} onChange={(e) => setField("status", e.target.value)}><option value="draft">Taslak</option><option value="ready">Hazır</option><option value="exported">Dışa aktarıldı</option></select></label>
+          <label className="block text-sm font-medium text-gray-800">Durum<select className={inputClass} value={form.status} onChange={(e) => setField("status", e.target.value)}><option value="draft">Taslak</option><option value="ready">Hazır</option><option value="exported">Dışa aktarıldı</option><option value="needs_review">İnceleme gerekli</option><option value="archived">Arşivlendi</option></select></label>
         </section>
       </div>
     </form>

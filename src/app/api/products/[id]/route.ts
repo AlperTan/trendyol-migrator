@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { buildProductReadiness } from "@/lib/product-readiness";
+import { logProductActivity, parseProductStatus } from "@/lib/product-activity";
 
 type RouteContext = {
   params: Promise<{
@@ -18,6 +20,10 @@ export async function GET(_: NextRequest, context: RouteContext) {
           sortOrder: "asc",
         },
       },
+      activities: {
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      },
     },
   });
 
@@ -28,13 +34,29 @@ export async function GET(_: NextRequest, context: RouteContext) {
     );
   }
 
-  return NextResponse.json(product);
+  const [categoryMappings, categories, brands] = await Promise.all([
+    db.categoryMapping.findMany({ where: { marketplace: "trendyol" } }),
+    db.marketplaceCategoryCache.findMany({ where: { marketplace: "trendyol" }, select: { externalId: true, name: true } }),
+    db.marketplaceBrandCache.findMany({ where: { marketplace: "trendyol" }, select: { externalId: true, name: true } }),
+  ]);
+  return NextResponse.json({
+    ...product,
+    readiness: buildProductReadiness(product, categoryMappings, { categories, brands }).readiness,
+  });
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const body = await req.json();
 
+  const current = await db.product.findUnique({ where: { id } });
+  if (!current) {
+    return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  }
+  const status = parseProductStatus(body.status);
+  if (body.status != null && !status) {
+    return NextResponse.json({ error: "Invalid product status" }, { status: 400 });
+  }
   const updated = await db.product.update({
     where: { id },
     data: {
@@ -55,8 +77,17 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       barcode: body.barcode ?? null,
       categoryName: body.categoryName ?? null,
       localCategoryId: body.localCategoryId ?? null,
-      status: body.status ?? "draft",
+      status: status ?? current.status,
     },
+  });
+  await logProductActivity({
+    productId: id,
+    type: "product_edited",
+    message:
+      current.status !== updated.status
+        ? `Product edited and status changed to ${updated.status}`
+        : "Product edited",
+    metadata: { previousStatus: current.status, status: updated.status },
   });
 
   return NextResponse.json(updated);

@@ -1,0 +1,6 @@
+import { MarketplaceBadge, PageHeader, StatusBadge } from "@/components/ui";
+import { db } from "@/lib/db";
+export default async function MarketplaceAccountsPage() {
+  const accounts = await db.marketplaceAccount.findMany({ orderBy: [{ marketplace: "asc" }, { name: "asc" }] });
+  return <main className="px-4 py-8 md:px-8"><div className="mx-auto max-w-6xl space-y-6"><PageHeader title="Pazaryerleri" description="Dışa aktarım işlemlerinde kullanılabilen pazaryeri hesaplarını görüntüleyin." /><section className="overflow-hidden rounded-[28px] border bg-white shadow-sm"><table className="min-w-full text-left text-sm"><thead className="bg-gray-50 text-gray-500"><tr><th className="px-4 py-3">Pazaryeri</th><th className="px-4 py-3">Hesap Adı</th><th className="px-4 py-3">Durum</th><th className="px-4 py-3">Son Güncelleme</th></tr></thead><tbody>{accounts.map((a) => <tr key={a.id} className="border-t"><td className="px-4 py-3"><MarketplaceBadge marketplace={a.marketplace} /></td><td className="px-4 py-3 font-medium">{a.name}</td><td className="px-4 py-3"><StatusBadge status={a.isActive ? "ready" : "archived"} /></td><td className="px-4 py-3 text-gray-500">{a.updatedAt.toLocaleString("tr-TR")}</td></tr>)}</tbody></table></section></div></main>;
+}

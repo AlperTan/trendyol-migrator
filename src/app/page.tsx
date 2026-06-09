@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import ImageLightbox from "@/components/image-lightbox";
+import ReadinessBadge from "@/components/readiness-badge";
+import BulkProductActions from "@/components/bulk-product-actions";
+import type { MarketplaceReadiness } from "@/core/readiness";
 
 type Product = {
   id: string;
@@ -30,6 +33,7 @@ type Product = {
     sortOrder: number;
     isSelected: boolean;
   }[];
+  readiness: MarketplaceReadiness;
 };
 
 type ProductsResponse = {
@@ -172,7 +176,7 @@ export default function HomePage() {
     return params.toString();
   }, [page, pageSize, selectedStatuses, searchTerm, brand, category]);
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
 
     try {
@@ -217,11 +221,13 @@ export default function HomePage() {
     }
 
     setLoading(false);
-  }
+  }, [queryString]);
 
   useEffect(() => {
-    loadProducts();
-  }, [queryString]);
+    // This effect intentionally synchronizes the client-side product table with its query filters.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProducts();
+  }, [loadProducts]);
 
   async function importProducts() {
     const promise = fetch("/api/import/trendyol", {
@@ -493,6 +499,33 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Link href="/dashboard" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Panel
+              </Link>
+              <Link href="/review" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                İnceleme Kuyruğu
+              </Link>
+              <Link href="/bulk/price-stock" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Fiyat ve Stok
+              </Link>
+              <Link href="/duplicates" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Yinelenen Ürünler
+              </Link>
+              <Link href="/readiness" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Hazırlık Durumu
+              </Link>
+              <Link href="/assistant/missing-data" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Eksik Veri Asistanı
+              </Link>
+              <Link href="/settings/marketplace-data" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Pazaryeri Verileri
+              </Link>
+              <Link href="/settings/product-templates" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Şablonlar
+              </Link>
+              <Link href="/settings/category-mappings" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                Eşleştirmeler
+              </Link>
               <Link href="/export" className="rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
                 Export
               </Link>
@@ -704,6 +737,9 @@ export default function HomePage() {
         </section>
 
         <section className="rounded-[28px] border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 p-4">
+            <BulkProductActions productIds={selectedIds} onDone={() => void loadProducts()} />
+          </div>
           <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-gray-500">
               Toplam <span className="font-semibold text-gray-900">{total}</span> ürün
@@ -739,6 +775,8 @@ export default function HomePage() {
                   <th className="px-4 py-3 font-medium">Satış Fiyatı</th>
                   <th className="px-4 py-3 font-medium">Kaynak Sevk</th>
                   <th className="px-4 py-3 font-medium">Yeni Sevk</th>
+                  <th className="px-4 py-3 font-medium">Shopify</th>
+                  <th className="px-4 py-3 font-medium">Trendyol</th>
                   <th className="px-4 py-3 font-medium">Detay</th>
                 </tr>
               </thead>
@@ -746,13 +784,13 @@ export default function HomePage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={14} className="px-4 py-10 text-center text-gray-500">
                       Yükleniyor...
                     </td>
                   </tr>
                 ) : products.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={14} className="px-4 py-10 text-center text-gray-500">
                       Bu filtrede ürün bulunamadı.
                     </td>
                   </tr>
@@ -790,6 +828,8 @@ export default function HomePage() {
                               }
                               className="block overflow-hidden rounded-xl border border-gray-200"
                             >
+                              {/* Product thumbnails may be arbitrary remote URLs that are not compatible with Next Image allowlists. */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={thumbSrc}
                                 alt=""
@@ -854,6 +894,12 @@ export default function HomePage() {
                           />
                         </td>
 
+                        <td className="px-4 py-3">
+                          <ReadinessBadge marketplace="Shopify" readiness={product.readiness.shopify} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <ReadinessBadge marketplace="Trendyol" readiness={product.readiness.trendyol} />
+                        </td>
                         <td className="px-4 py-3">
                           <Link
                             href={`/products/${product.id}`}

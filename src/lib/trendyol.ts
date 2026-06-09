@@ -13,6 +13,28 @@ type FetchProductsParams = TrendyolCredentials & {
   onSale?: boolean;
 };
 
+export type TrendyolProductRecord = Record<string, unknown>;
+
+type TrendyolProductsPage = TrendyolProductRecord & {
+  content?: TrendyolProductRecord[];
+  totalPages?: number;
+  totalElements?: number;
+};
+
+type TrendyolCategoryLookupResponse = TrendyolProductRecord & {
+  barcodeCategories?: Record<string, { id: number; displayName?: string }>;
+  notFound?: string[];
+};
+
+function isRecord(value: unknown): value is TrendyolProductRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function responseMessage(value: unknown): unknown {
+  if (!isRecord(value)) return undefined;
+  return value.message ?? value.error ?? value.exception;
+}
+
 export type TrendyolLegacyDeliveryUpdateItem = {
   barcode: string;
   title: string;
@@ -47,10 +69,10 @@ function buildHeaders({
   };
 }
 
-async function parseJsonResponse(res: Response) {
+async function parseJsonResponse(res: Response): Promise<unknown> {
   const text = await res.text();
 
-  let data: any;
+  let data: unknown;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -65,9 +87,7 @@ async function parseJsonResponse(res: Response) {
         {
           httpStatus: res.status,
           message:
-            data?.message ||
-            data?.error ||
-            data?.exception ||
+            responseMessage(data) ||
             "Trendyol API hatası",
           response: data,
         },
@@ -149,7 +169,8 @@ export async function fetchProductsPage({
     cache: "no-store",
   });
 
-  const data = await parseJsonResponse(res);
+  const rawData = await parseJsonResponse(res);
+  const data: TrendyolProductsPage = isRecord(rawData) ? rawData : {};
 
   console.log("TRENDYOL PAGE META", {
     page,
@@ -175,7 +196,7 @@ export async function fetchAllProducts(
     onSale?: boolean;
   }
 ) {
-  const allItems: any[] = [];
+  const allItems: TrendyolProductRecord[] = [];
   let page = 0;
   let totalPages = 1;
 
@@ -185,7 +206,9 @@ export async function fetchAllProducts(
       page,
     });
 
-    const items = Array.isArray(data?.content) ? data.content : [];
+    const items = Array.isArray(data.content)
+      ? data.content.filter(isRecord)
+      : [];
     allItems.push(...items);
 
     totalPages =
@@ -224,7 +247,8 @@ export async function fetchProductBaseInfoByBarcode(
     cache: "no-store",
   });
 
-  return parseJsonResponse(res);
+  const data = await parseJsonResponse(res);
+  return isRecord(data) ? data : null;
 }
 
 export async function fetchCategoryIdsByBarcodes(
@@ -269,10 +293,11 @@ export async function fetchCategoryIdsByBarcodes(
       cache: "no-store",
     });
 
-    const data = await parseJsonResponse(res);
+    const rawData = await parseJsonResponse(res);
+    const data: TrendyolCategoryLookupResponse = isRecord(rawData) ? rawData : {};
 
-    const barcodeCategories = data?.barcodeCategories ?? {};
-    const notFound = Array.isArray(data?.notFound) ? data.notFound : [];
+    const barcodeCategories = data.barcodeCategories ?? {};
+    const notFound = Array.isArray(data.notFound) ? data.notFound : [];
 
     for (const [barcode, category] of Object.entries(barcodeCategories)) {
       mergedBarcodeCategories[barcode] = category as {
@@ -363,11 +388,15 @@ export async function updateDeliveryDurationsLegacy(
   });
 
   const data = await parseJsonResponse(res);
+  const batchRequestId =
+    isRecord(data) && typeof data.batchRequestId === "string"
+      ? data.batchRequestId
+      : null;
 
   return {
     ok: true,
     requestCount: items.length,
-    batchRequestId: data?.batchRequestId ?? null,
+    batchRequestId,
     raw: data,
   };
 }

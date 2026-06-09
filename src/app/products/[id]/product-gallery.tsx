@@ -28,16 +28,11 @@ export default function ProductGallery({
   const selected = ordered.filter((img) => img.isSelected);
   const gallery = selected.length > 0 ? selected : ordered;
 
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [requestedIndex, setActiveIndex] = useState(0);
+  const activeIndex = Math.min(requestedIndex, Math.max(gallery.length - 1, 0));
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const thumbRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  useEffect(() => {
-    if (activeIndex > gallery.length - 1) {
-      setActiveIndex(0);
-    }
-  }, [activeIndex, gallery.length]);
 
   useEffect(() => {
     const activeThumb = thumbRefs.current[activeIndex];
@@ -69,11 +64,11 @@ export default function ProductGallery({
   const activeSrc = active.localPath ?? active.sourceUrl;
 
   function goPrev() {
-    setActiveIndex((prev) => (prev === 0 ? gallery.length - 1 : prev - 1));
+    setActiveIndex(activeIndex === 0 ? gallery.length - 1 : activeIndex - 1);
   }
 
   function goNext() {
-    setActiveIndex((prev) => (prev === gallery.length - 1 ? 0 : prev + 1));
+    setActiveIndex(activeIndex === gallery.length - 1 ? 0 : activeIndex + 1);
   }
 
   const lightboxImages = gallery.map((img) => ({
@@ -116,6 +111,8 @@ export default function ProductGallery({
             className="group relative block w-full overflow-hidden rounded-[24px] bg-gray-100"
           >
             <div className="aspect-square w-full md:aspect-[4/4.2]">
+              {/* Gallery sources include arbitrary marketplace URLs, so native img preserves existing compatibility. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={activeSrc}
                 alt={title}
@@ -164,6 +161,8 @@ export default function ProductGallery({
                       }`}
                       aria-label={`Görsel ${index + 1}`}
                     >
+                      {/* Gallery sources include arbitrary marketplace URLs, so native img preserves existing compatibility. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={src}
                         alt={title}

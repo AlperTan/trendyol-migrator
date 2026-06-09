@@ -292,6 +292,8 @@ export default function ImageManager({
                   onClick={() => openLightbox(index)}
                   className="relative block aspect-square w-full overflow-hidden bg-gray-100"
                 >
+                  {/* Editable product images may use arbitrary remote URLs or local processed paths. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={src}
                     alt=""

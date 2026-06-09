@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logProductActivity } from "@/lib/product-activity";
 
 type RouteContext = {
   params: Promise<{
@@ -57,6 +58,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
           },
         },
       },
+    });
+    await logProductActivity({
+      productId,
+      type: "image_processed",
+      message: "Image selection or order updated",
+      metadata: { imageCount: images.length },
     });
 
     return NextResponse.json(updated);

@@ -26,6 +26,12 @@ function action(value: unknown): string | null {
   return typeof result === "string" ? result : null;
 }
 
+function batchRequestId(value: unknown): string | null {
+  if (!value || typeof value !== "object" || !("batchRequestId" in value)) return null;
+  const result = (value as { batchRequestId?: unknown }).batchRequestId;
+  return typeof result === "string" ? result : null;
+}
+
 export default async function ExportJobDetailPage({ params }: PageProps) {
   const { id } = await params;
   const job = await db.exportJob.findUnique({
@@ -65,7 +71,7 @@ export default async function ExportJobDetailPage({ params }: PageProps) {
             </div>
             <div className="flex flex-wrap gap-2">
               <RefreshButton />
-              {job.targetMarketplace === "shopify" ? <RunShopifyExportButton jobId={job.id} disabled={job.status === "running"} /> : null}
+              {job.targetMarketplace === "shopify" || job.targetMarketplace === "trendyol" ? <RunShopifyExportButton jobId={job.id} disabled={job.status === "running"} marketplace={job.targetMarketplace} /> : null}
             </div>
           </div>
         </section>
@@ -73,6 +79,7 @@ export default async function ExportJobDetailPage({ params }: PageProps) {
           {job.items.map((item) => {
             const itemWarnings = warnings(item.responsePayload);
             const itemAction = action(item.responsePayload);
+            const itemBatchRequestId = batchRequestId(item.responsePayload);
             const shopifyAdminUrl =
               job.targetMarketplace === "shopify" && item.targetExternalId
                 ? getShopifyAdminProductUrl(item.targetExternalId)
@@ -84,6 +91,7 @@ export default async function ExportJobDetailPage({ params }: PageProps) {
                   <div>
                     <Link href={`/products/${item.product.id}`} className="font-semibold text-gray-900 hover:underline">{item.product.titleEdited ?? item.product.titleSource}</Link>
                     <p className="mt-1 text-sm text-gray-500">SKU: {item.product.sku ?? "-"} · External ID: {item.targetExternalId ?? "-"}</p>
+                    {itemBatchRequestId ? <p className="mt-1 text-sm font-medium text-blue-700">Batch request ID: {itemBatchRequestId}</p> : null}
                     {shopifyAdminUrl ? <a href={shopifyAdminUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-sm font-medium text-blue-700 hover:underline">Open in Shopify Admin</a> : null}
                   </div>
                   <div className="flex gap-2">

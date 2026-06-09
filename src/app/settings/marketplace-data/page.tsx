@@ -1,0 +1,8 @@
+import { PageHeader, StatCard } from "@/components/ui";
+import { db } from "@/lib/db";
+import SyncPanel from "./sync-panel";
+export default async function MarketplaceDataPage() {
+  const [tc, tb, ta, sc, tcLast, tbLast, taLast, scLast] = await Promise.all([db.marketplaceCategoryCache.count({ where: { marketplace: "trendyol" } }), db.marketplaceBrandCache.count({ where: { marketplace: "trendyol" } }), db.marketplaceAttributeCache.count({ where: { marketplace: "trendyol" } }), db.marketplaceCategoryCache.count({ where: { marketplace: "shopify" } }), db.marketplaceCategoryCache.findFirst({ where: { marketplace: "trendyol" }, orderBy: { updatedAt: "desc" } }), db.marketplaceBrandCache.findFirst({ where: { marketplace: "trendyol" }, orderBy: { updatedAt: "desc" } }), db.marketplaceAttributeCache.findFirst({ where: { marketplace: "trendyol" }, orderBy: { updatedAt: "desc" } }), db.marketplaceCategoryCache.findFirst({ where: { marketplace: "shopify" }, orderBy: { updatedAt: "desc" } })]);
+  const cards = [["Trendyol Kategorileri", tc, tcLast], ["Trendyol Markaları", tb, tbLast], ["Trendyol Özellikleri", ta, taLast], ["Shopify Ürün Tipleri", sc, scLast]] as const;
+  return <main className="px-4 py-8 md:px-8"><div className="mx-auto max-w-6xl space-y-6"><PageHeader title="Pazaryeri Verileri" description="Öneriler ve otomatik hazırlık kontrollerinde kullanılan pazaryeri verilerini güncelleyin." actions={<SyncPanel />} /><section className="grid gap-4 md:grid-cols-2">{cards.map(([label, count, latest]) => <StatCard key={label} label={label} value={count} hint={`Son eşitleme: ${latest?.updatedAt.toLocaleString("tr-TR") ?? "Henüz eşitlenmedi"}`} />)}</section></div></main>;
+}

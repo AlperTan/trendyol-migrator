@@ -1,5 +1,6 @@
 import type { ExportResult, MarketplaceAdapter, ValidationResult } from "@/core/marketplace";
 import type { NormalizedProduct } from "@/core/normalized-product";
+import { calculateProductCompleteness } from "@/core/completeness";
 import { ShopifyClient } from "./client";
 import { mapProductToShopify } from "./mapper";
 import type { ShopifyExportOptions } from "./types";
@@ -17,19 +18,17 @@ type VariantResponse = { productVariantsBulkUpdate: { productVariants: unknown[]
 const COMMON_CURRENCIES = new Set(["TRY", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]);
 
 export function validateShopifyProduct(product: NormalizedProduct): ValidationResult {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const payload = mapProductToShopify(product);
-
-  if (!product.title.trim()) errors.push("Title is required");
-  if (product.price == null || product.price <= 0) errors.push("Price must be greater than 0");
-  if (!product.sku) warnings.push("SKU is missing");
+  const completeness = calculateProductCompleteness(product, "shopify");
+  const errors = [...completeness.errors];
+  const warnings = [...completeness.warnings];
   if (!COMMON_CURRENCIES.has(product.currency.toUpperCase())) {
     warnings.push(`Currency ${product.currency} is uncommon and will not be sent to Shopify`);
   }
-  if (payload.media.length === 0) warnings.push("No exportable absolute image URL is available");
-
-  return { valid: errors.length === 0, errors, warnings };
+  return {
+    valid: errors.length === 0,
+    errors: Array.from(new Set(errors)),
+    warnings: Array.from(new Set(warnings)),
+  };
 }
 
 export async function exportProductToShopify(

@@ -25,6 +25,18 @@ export type NormalizedProduct = {
   sourceMarketplace: Marketplace | null;
   sourceExternalId: string | null;
   editedFields: Record<string, boolean>;
+  marketplaceData: {
+    trendyol?: {
+      productMainId: string | null;
+      brandId: number | null;
+      categoryId: number | null;
+      cargoCompanyId: number | null;
+      deliveryDuration: number | null;
+      shipmentAddressId: number | null;
+      returningAddressId: number | null;
+      requiredAttributes: unknown[];
+    };
+  };
 };
 
 export type ProductWithImages = {
@@ -45,8 +57,21 @@ export type ProductWithImages = {
   categorySource: string | null;
   categoryName: string | null;
   localCategoryId: string | null;
+  attributesJson: unknown;
   sourcePlatform: string | null;
   sourceProductId: string | null;
+  productMainId: string | null;
+  brandId: number | null;
+  categoryId: number | null;
+  cargoCompanyId: number | null;
+  deliveryDurationSource: number | null;
+  deliveryDurationEdited: number | null;
+  shipmentAddressId: number | null;
+  returningAddressId: number | null;
+  suggestedBrandId: number | null;
+  suggestedBrandConfidence: number | null;
+  suggestedCategoryId: number | null;
+  suggestedCategoryConfidence: number | null;
   images: Array<{
     id: string;
     sourceUrl: string;
@@ -82,7 +107,12 @@ export function buildNormalizedProduct(product: ProductWithImages): NormalizedPr
         selectedForExport: image.isSelected,
       }))
       .sort((a, b) => a.sortOrder - b.sortOrder),
-    attributes: {},
+    attributes:
+      product.attributesJson &&
+      typeof product.attributesJson === "object" &&
+      !Array.isArray(product.attributesJson)
+        ? (product.attributesJson as Record<string, unknown>)
+        : {},
     sourceMarketplace: asMarketplace(product.sourcePlatform),
     sourceExternalId: product.sourceProductId,
     editedFields: {
@@ -91,6 +121,29 @@ export function buildNormalizedProduct(product: ProductWithImages): NormalizedPr
       price: product.salePriceEdited != null,
       vatRate: product.vatRateEdited != null,
       categoryName: product.categoryName != null,
+    },
+    marketplaceData: {
+      trendyol: {
+        productMainId: product.productMainId,
+        brandId:
+          product.brandId ??
+          (product.suggestedBrandConfidence != null &&
+          product.suggestedBrandConfidence >= 0.9
+            ? product.suggestedBrandId
+            : null),
+        categoryId:
+          product.categoryId ??
+          (product.suggestedCategoryConfidence != null &&
+          product.suggestedCategoryConfidence >= 0.75
+            ? product.suggestedCategoryId
+            : null),
+        cargoCompanyId: product.cargoCompanyId,
+        deliveryDuration:
+          product.deliveryDurationEdited ?? product.deliveryDurationSource,
+        shipmentAddressId: product.shipmentAddressId,
+        returningAddressId: product.returningAddressId,
+        requiredAttributes: [],
+      },
     },
   };
 }

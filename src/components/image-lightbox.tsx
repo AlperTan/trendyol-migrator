@@ -97,6 +97,8 @@ export default function ImageLightbox({
 
         <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/95 p-3 shadow-2xl md:p-4">
           <div className="overflow-hidden rounded-[22px] bg-gray-100">
+            {/* Lightbox accepts arbitrary remote and local image sources from product records. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={current.src}
               alt={current.alt ?? ""}
@@ -124,6 +126,8 @@ export default function ImageLightbox({
                     }`}
                     aria-label={`Görsel ${index + 1}`}
                   >
+                    {/* Lightbox accepts arbitrary remote and local image sources from product records. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={image.src}
                       alt={image.alt ?? ""}
